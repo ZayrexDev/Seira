@@ -1,16 +1,16 @@
-package xyz.zcraft.bot;
+package xyz.zcraft.platform.qq;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.Config;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
+import xyz.zcraft.platform.PlatformMessageSender;
 import xyz.zcraft.util.AccessToken;
 import xyz.zcraft.util.NetworkHelper;
 
 import java.util.function.Supplier;
 
-public class MessageSender {
+public class MessageSender implements PlatformMessageSender {
     private static final Logger LOG = LogManager.getLogger(MessageSender.class);
 
     private final Supplier<AccessToken> tokenSupplier;
@@ -59,4 +59,3 @@ public class MessageSender {
         }
     }
 }
-

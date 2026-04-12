@@ -4,10 +4,11 @@ import io.github.cdimascio.dotenv.Dotenv;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.bot.GatewayWebSocketClient;
-import xyz.zcraft.bot.MessageSender;
+import xyz.zcraft.platform.BotPlatformAdapter;
+import xyz.zcraft.platform.PlatformGatewayClient;
+import xyz.zcraft.platform.PlatformMessageSender;
+import xyz.zcraft.platform.qq.QqPlatformAdapter;
 import xyz.zcraft.util.AccessToken;
-import xyz.zcraft.util.NetworkHelper;
 
 import java.net.URI;
 import java.util.Timer;
@@ -19,6 +20,7 @@ public class Seira {
     private static Config config;
     private static AccessToken accessToken;
     private static final Timer timer = new Timer("access-token-renewal", true);
+    private static final BotPlatformAdapter platformAdapter = new QqPlatformAdapter();
 
     static void main() {
         LOG.info("Loading .env ...");
@@ -28,15 +30,15 @@ public class Seira {
         LOG.info("Getting access token");
         renewAccessToken();
 
-        MessageSender messageSender = new MessageSender(() -> accessToken);
+        PlatformMessageSender messageSender = platformAdapter.createMessageSender(() -> accessToken);
 
         while (true) {
             try {
                 LOG.info("Getting wss endpoint");
-                String wssEndpoint = NetworkHelper.getWSSEndpoint(accessToken);
+                String wssEndpoint = platformAdapter.getGatewayEndpoint(accessToken);
                 LOG.info("Endpoint: {}", wssEndpoint);
 
-                GatewayWebSocketClient client = new GatewayWebSocketClient(
+                PlatformGatewayClient client = platformAdapter.createGatewayClient(
                         URI.create(wssEndpoint),
                         config,
                         () -> accessToken,
@@ -62,7 +64,7 @@ public class Seira {
 
     public static void renewAccessToken() {
         if (accessToken == null || accessToken.isExpired()) {
-            accessToken = NetworkHelper.getAccessToken(config);
+            accessToken = platformAdapter.getAccessToken(config);
             LOG.info("Token renewed, expire in {}", accessToken.expiresIn());
             long renewDelayMs = Math.max(5, accessToken.expiresIn() - 60) * 1000L;
             timer.schedule(new TimerTask() {
