@@ -5,9 +5,9 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.platform.BotPlatformAdapter;
+import xyz.zcraft.platform.BotPlatformAdapters;
 import xyz.zcraft.platform.PlatformGatewayClient;
 import xyz.zcraft.platform.PlatformMessageSender;
-import xyz.zcraft.platform.qq.QqPlatformAdapter;
 import xyz.zcraft.util.AccessToken;
 
 import java.net.URI;
@@ -20,12 +20,14 @@ public class Seira {
     private static Config config;
     private static AccessToken accessToken;
     private static final Timer timer = new Timer("access-token-renewal", true);
-    private static final BotPlatformAdapter platformAdapter = new QqPlatformAdapter();
+    private static BotPlatformAdapter platformAdapter;
 
     static void main() {
         LOG.info("Loading .env ...");
         final Dotenv env = Dotenv.load();
         config = Config.fromEnv(env);
+        platformAdapter = BotPlatformAdapters.create(config);
+        LOG.info("Selected platform adapter: {}", config.platform());
 
         LOG.info("Getting access token");
         renewAccessToken();

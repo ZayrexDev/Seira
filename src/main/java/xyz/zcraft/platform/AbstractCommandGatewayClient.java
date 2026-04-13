@@ -23,6 +23,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     protected void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
+        handleMessageReceived(userId, messageId, rawContent, false);
+    }
+
+    protected void onGroupMessageReceived(String groupId, String messageId, String rawContent) {
+        handleMessageReceived(groupId, messageId, rawContent, true);
+    }
+
+    private void handleMessageReceived(String targetId, String messageId, String rawContent, boolean groupMessage) {
         try {
             PendingMessage pendingMsg = route(rawContent);
             if (pendingMsg == null) {
@@ -35,7 +43,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             message.setMsgId(messageId);
 
             if (pendingMsg.getFileUrl() != null) {
-                FileInfo fileInfo = messageSender.uploadPrivateMedia(userId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
+                FileInfo fileInfo = groupMessage
+                        ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
+                        : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
                 if (fileInfo == null) {
                     LOG.error("Failed to upload media for message {}", messageId);
                     return;
@@ -43,7 +53,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 LOG.info("Media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
             } else if (pendingMsg.getFileBase64() != null) {
-                FileInfo fileInfo = messageSender.uploadPrivateMediaBase64(userId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
+                FileInfo fileInfo = groupMessage
+                        ? messageSender.uploadGroupMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64())
+                        : messageSender.uploadPrivateMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
                 if (fileInfo == null) {
                     LOG.error("Failed to upload base64 media for message {}", messageId);
                     return;
@@ -52,14 +64,22 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 message.setMedia(fileInfo);
             }
 
-            messageSender.sendPrivateMessage(userId, message);
+            if (groupMessage) {
+                messageSender.sendGroupMessage(targetId, message);
+            } else {
+                messageSender.sendPrivateMessage(targetId, message);
+            }
         } catch (Exception e) {
             Message message = new Message();
             message.setContent("处理指令时发生错误，请稍后再试。");
             message.setMsgType(0);
             message.setMsgId(messageId);
-            messageSender.sendPrivateMessage(userId, message);
-            LOG.error("Failed to process private message {}", messageId, e);
+            if (groupMessage) {
+                messageSender.sendGroupMessage(targetId, message);
+            } else {
+                messageSender.sendPrivateMessage(targetId, message);
+            }
+            LOG.error("Failed to process inbound message {}", messageId, e);
         }
     }
 

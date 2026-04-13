@@ -27,23 +27,41 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 
 ### 2) 配置 `.env`
 
-必需项：
+通用必需项：
+
+- `SEIRA_PLATFORM`（`qq` 或 `napcat`，默认 `qq`）
+- `SEIRA_OSTELLA_ENDPOINT`
+
+`qq` 平台额外必需项：
 
 - `SEIRA_APPID`
 - `SEIRA_APPSECRET`
-- `SEIRA_OSTELLA_ENDPOINT`
 
 可选项：
 
 - `SEIRA_INTENTS`（默认 `(1 << 25)`）
+- `SEIRA_NAPCAT_WS_ENDPOINT`（仅 `napcat` 平台必需）
+- `SEIRA_NAPCAT_HTTP_ENDPOINT`（仅 `napcat` 平台必需）
+- `SEIRA_NAPCAT_TOKEN`（Napcat 开启鉴权时填写）
 
 示例：
 
 ```env
+SEIRA_PLATFORM=qq
 SEIRA_APPID=your_app_id
 SEIRA_APPSECRET=your_app_secret
 SEIRA_OSTELLA_ENDPOINT=http://localhost:8721
 SEIRA_INTENTS=33554432
+```
+
+Napcat 示例：
+
+```env
+SEIRA_PLATFORM=napcat
+SEIRA_OSTELLA_ENDPOINT=http://localhost:8721
+SEIRA_NAPCAT_WS_ENDPOINT=ws://127.0.0.1:3001
+SEIRA_NAPCAT_HTTP_ENDPOINT=http://127.0.0.1:3000
+SEIRA_NAPCAT_TOKEN=
 ```
 
 ### 3) 构建并启动

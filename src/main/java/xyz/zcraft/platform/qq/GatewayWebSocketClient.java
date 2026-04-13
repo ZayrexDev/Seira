@@ -80,6 +80,8 @@ public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
     }
 
     private void onDispatch(JsonObject payload) {
+        System.out.println(payload);
+
         String eventType = payload.get("t").getAsString();
 
         if ("C2C_MESSAGE_CREATE".equals(eventType)) {
