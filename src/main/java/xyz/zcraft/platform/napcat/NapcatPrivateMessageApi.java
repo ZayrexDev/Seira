@@ -16,7 +16,9 @@ import java.net.http.HttpResponse;
 
 public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
     private static final Logger LOG = LogManager.getLogger(NapcatPrivateMessageApi.class);
-    private static final HttpClient CLIENT = HttpClient.newBuilder().build();
+    private static final HttpClient CLIENT = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .build();
     private static final Gson GSON = new Gson();
 
     private final String httpEndpoint;
@@ -106,6 +108,7 @@ public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(requestUrl))
+                    .version(HttpClient.Version.HTTP_1_1)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload)));
             if (!authToken.isEmpty()) {
@@ -114,9 +117,9 @@ public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
 
             HttpResponse<String> response = CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                String message = "Napcat API request failed: method=POST url=" + requestUrl + " status=" + response.statusCode() + " body=" + response.body();
+                String message = "Napcat API request failed: method=POST url=" + requestUrl + " status=" + response.statusCode() + " protocol=" + response.version() + " body=" + response.body();
                 if (response.statusCode() == 405) {
-                    message += " ; tip: SEIRA_NAPCAT_HTTP_ENDPOINT may be configured as a WS route. Use Napcat HTTP API endpoint instead.";
+                    message += " ; tip: endpoint/proxy may only accept HTTP/1.1 API routes. Confirm SEIRA_NAPCAT_HTTP_ENDPOINT points to Napcat HTTP API instead of WS route.";
                 }
                 throw new RuntimeException(message);
             }
