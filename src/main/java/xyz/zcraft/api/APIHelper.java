@@ -22,10 +22,25 @@ public class APIHelper {
         ENDPOINT = Seira.getConfig().endpoint();
     }
 
-    public static String getBoN(int n, int id) {
+    public static String getBoN(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + id))
+                    .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + uid))
+                    .GET()
+                    .build();
+            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+
+            return Base64.getEncoder().encodeToString(imageBytes);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String getGroupLeaderboard(int bm, String[] uids) {
+        String uidsParam = String.join(",", uids);
+        try {
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/pk?" + "bm=" + bm + "&u=" + uidsParam))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
@@ -87,10 +102,10 @@ public class APIHelper {
         }
     }
 
-    public static String getRecent(int n, int id) {
+    public static String getRecent(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + id))
+                    .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + uid))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
@@ -101,10 +116,10 @@ public class APIHelper {
         }
     }
 
-    public static String getBeatmap(int id) {
+    public static String getBeatmap(int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/bm?" + "&bm=" + id))
+                    .uri(URI.create(ENDPOINT + "/bm?" + "&bm=" + uid))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();

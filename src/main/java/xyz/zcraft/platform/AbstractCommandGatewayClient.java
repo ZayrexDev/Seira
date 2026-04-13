@@ -23,35 +23,44 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     protected void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
-        PendingMessage pendingMsg = route(rawContent);
-        if (pendingMsg == null) {
-            return;
-        }
-
-        Message message = new Message();
-        message.setContent(pendingMsg.getContent());
-        message.setMsgType(pendingMsg.getMsgType());
-        message.setMsgId(messageId);
-
-        if (pendingMsg.getFileUrl() != null) {
-            FileInfo fileInfo = messageSender.uploadPrivateMedia(userId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
-            if (fileInfo == null) {
-                LOG.error("Failed to upload media for message {}", messageId);
+        try {
+            PendingMessage pendingMsg = route(rawContent);
+            if (pendingMsg == null) {
                 return;
             }
-            LOG.info("Media uploaded for message {}", messageId);
-            message.setMedia(fileInfo);
-        } else if (pendingMsg.getFileBase64() != null) {
-            FileInfo fileInfo = messageSender.uploadPrivateMediaBase64(userId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
-            if (fileInfo == null) {
-                LOG.error("Failed to upload base64 media for message {}", messageId);
-                return;
-            }
-            LOG.info("Base64 media uploaded for message {}", messageId);
-            message.setMedia(fileInfo);
-        }
 
-        messageSender.sendPrivateMessage(userId, message);
+            Message message = new Message();
+            message.setContent(pendingMsg.getContent());
+            message.setMsgType(pendingMsg.getMsgType());
+            message.setMsgId(messageId);
+
+            if (pendingMsg.getFileUrl() != null) {
+                FileInfo fileInfo = messageSender.uploadPrivateMedia(userId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
+                if (fileInfo == null) {
+                    LOG.error("Failed to upload media for message {}", messageId);
+                    return;
+                }
+                LOG.info("Media uploaded for message {}", messageId);
+                message.setMedia(fileInfo);
+            } else if (pendingMsg.getFileBase64() != null) {
+                FileInfo fileInfo = messageSender.uploadPrivateMediaBase64(userId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
+                if (fileInfo == null) {
+                    LOG.error("Failed to upload base64 media for message {}", messageId);
+                    return;
+                }
+                LOG.info("Base64 media uploaded for message {}", messageId);
+                message.setMedia(fileInfo);
+            }
+
+            messageSender.sendPrivateMessage(userId, message);
+        } catch (Exception e) {
+            Message message = new Message();
+            message.setContent("处理指令时发生错误，请稍后再试。");
+            message.setMsgType(0);
+            message.setMsgId(messageId);
+            messageSender.sendPrivateMessage(userId, message);
+            LOG.error("Failed to process private message {}", messageId, e);
+        }
     }
 
     protected PendingMessage route(String rawContent) {
@@ -106,7 +115,15 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 }
             }
             case "c" -> {
-                return PendingMessage.ofString("未找到已经绑定的玩家");
+                if (args.length == 2) {
+                    int bm = Integer.parseInt(args[0]);
+                    String uids = args[1];
+                    return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uids.split(",")));
+                } else if (args.length == 1) {
+                    // TODO implement this variant in command service.
+                } else {
+                    return PendingMessage.ofString("用法：/c <铺面ID> [玩家ID,[玩家ID...]]");
+                }
             }
             case "status" -> {
                 return PendingMessage.ofString("服务器状态：正常");
