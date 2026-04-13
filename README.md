@@ -1,16 +1,20 @@
 # Seira
 
-Seira 是一个面向私聊场景的 Java QQ 机器人客户端。
-你给它发斜杠命令，它会调用后端接口并回你文本或图片结果。
+Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
+支持生成最好成绩图、最近成绩图、排行榜等，持续更新中...
 
-目前 Seira 依赖 [oStella](https://github.com/ZayrexDev/oStella) 作为上游数据服务（例如成绩图和日常数据）。
+目前 Seira 依赖 [oStella](https://github.com/ZayrexDev/oStella) 作为上游数据服务。
 
-## Seira 能做什么
+## 演示
 
-- 连接 QQ Gateway，并自动维持心跳
-- 自动获取并续期 access token
-- 监听私聊事件 `C2C_MESSAGE_CREATE`
-- 识别 `/` 命令并返回文本或图片
+### 最好成绩
+<img width="900" alt="image" src="https://github.com/user-attachments/assets/f4ff6ac7-b241-4c6b-956e-9c258c27faa7" />
+
+### 铺面信息
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/0b8c51aa-ecf7-4e9e-9f67-327ce53ad9e3" />
+
+### 排行榜
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/4a229779-c674-4172-8d6b-6accdabb5a5e" />
 
 ## 快速开始
 
@@ -53,26 +57,13 @@ java -jar target/Seira-1.0-SNAPSHOT-jar-with-dependencies.jar
 
 > 所有命令都以 `/` 开头。
 
-| 命令        | 用法                    | 结果          |
-|-----------|-----------------------|-------------|
-| `/status` | `/status`             | 服务状态文本      |
-| `/daily`  | `/daily`              | 每日挑战信息      |
-| `/mp`     | `/mp`                 | 多人房间列表      |
-| `/bo`     | `/bo <n> <playerId>`  | Best 成绩图片   |
-| `/top`    | `/top <n> <playerId>` | 同 `/bo`     |
-| `/rs`     | `/rs <n> <playerId>`  | Recent 成绩图片 |
-| `/c`      | `/c`                  | 占位回复（功能未完成） |
-
-已知限制：
-
-- `/bo`、`/rs` 的单参数模式还没实现
-- `/c` 目前是占位命令
-- `/bo`、`/top`、`/rs` 参数不是整数时，可能抛出 `NumberFormatException`
-
-## 日志与产物
-
-- 运行日志：`logs/latest.log`（以及滚动归档 `*.log.gz`）
-- 打包产物：
-  - `target/Seira-1.0-SNAPSHOT.jar`
-  - `target/Seira-1.0-SNAPSHOT-jar-with-dependencies.jar`
+| 命令        | 用法                           | 结果             |
+|-----------|------------------------------|----------------|
+| `/status` | `/status`                    | 服务状态文本         |
+| `/daily`  | `/daily`                     | 每日挑战信息         |
+| `/mp`     | `/mp`                        | 多人房间列表         |
+| `/bo`     | `/bo <n> <uid>`              | Best 成绩图片      |
+| `/top`    | `/top <n> <uid>`             | 同 `/bo`        |
+| `/rs`     | `/rs <n> <uid>`              | Recent 成绩图片    |
+| `/c`      | `/c <bm> <uid1>[,<uid2>]...` | 生成指定用户的特定铺面排行榜 |
 
