@@ -25,7 +25,7 @@ public class APIHelper {
     public static String getBoN(int n, int id) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&id=" + id))
+                    .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + id))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
@@ -90,7 +90,7 @@ public class APIHelper {
     public static String getRecent(int n, int id) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&id=" + id))
+                    .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + id))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
@@ -104,7 +104,7 @@ public class APIHelper {
     public static String getBeatmap(int id) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/bm?" + "&id=" + id))
+                    .uri(URI.create(ENDPOINT + "/bm?" + "&bm=" + id))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
