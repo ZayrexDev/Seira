@@ -35,7 +35,7 @@ public class NapcatPlatformAdapter implements BotPlatformAdapter {
 
     @Override
     public PlatformGatewayClient createGatewayClient(URI serverUri, Config config, Supplier<AccessToken> tokenSupplier, PlatformMessageSender messageSender) {
-        return new NapcatGatewayWebSocketClient(serverUri, messageSender);
+        return new NapcatGatewayWebSocketClient(serverUri, messageSender, this.config.napcatToken());
     }
 }
 

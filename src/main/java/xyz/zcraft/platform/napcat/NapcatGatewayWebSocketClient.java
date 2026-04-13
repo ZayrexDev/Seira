@@ -13,14 +13,20 @@ import java.net.URI;
 public class NapcatGatewayWebSocketClient extends AbstractCommandGatewayClient {
     private static final Logger LOG = LogManager.getLogger(NapcatGatewayWebSocketClient.class);
     private static final Gson GSON = new Gson();
+    private final boolean wsAuthEnabled;
 
-    public NapcatGatewayWebSocketClient(URI serverUri, PlatformMessageSender messageSender) {
+    public NapcatGatewayWebSocketClient(URI serverUri, PlatformMessageSender messageSender, String authToken) {
         super(serverUri, messageSender);
+        String trimmedToken = authToken == null ? "" : authToken.trim();
+        this.wsAuthEnabled = !trimmedToken.isEmpty();
+        if (wsAuthEnabled) {
+            addHeader("Authorization", "Bearer " + trimmedToken);
+        }
     }
 
     @Override
     public void onOpen(ServerHandshake handshake) {
-        LOG.info("Napcat gateway connected");
+        LOG.info("Napcat gateway connected. endpoint={}, wsAuthEnabled={}", getURI(), wsAuthEnabled);
     }
 
     @Override
@@ -56,7 +62,15 @@ public class NapcatGatewayWebSocketClient extends AbstractCommandGatewayClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        LOG.warn("Napcat gateway closed. code={}, reason={}, remote={}", code, reason, remote);
+        String normalizedReason = (reason == null || reason.isBlank()) ? "<empty>" : reason;
+        LOG.warn(
+                "Napcat gateway closed. code={}, reason={}, remote={}, endpoint={}, wsAuthEnabled={}",
+                code,
+                normalizedReason,
+                remote,
+                getURI(),
+                wsAuthEnabled
+        );
     }
 
     @Override
