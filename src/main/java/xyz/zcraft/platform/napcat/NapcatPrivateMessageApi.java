@@ -2,6 +2,8 @@ package xyz.zcraft.platform.napcat;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.platform.PlatformPrivateMessageApi;
@@ -13,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
+    private static final Logger LOG = LogManager.getLogger(NapcatPrivateMessageApi.class);
     private static final HttpClient CLIENT = HttpClient.newBuilder().build();
     private static final Gson GSON = new Gson();
 
@@ -20,7 +23,7 @@ public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
     private final String authToken;
 
     public NapcatPrivateMessageApi(String httpEndpoint, String authToken) {
-        this.httpEndpoint = trimEndpoint(httpEndpoint);
+        this.httpEndpoint = normalizeEndpoint(httpEndpoint);
         this.authToken = authToken == null ? "" : authToken.trim();
     }
 
@@ -99,9 +102,10 @@ public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
     }
 
     private void post(String path, JsonObject payload) {
+        String requestUrl = buildRequestUrl(path);
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(httpEndpoint + path))
+                    .uri(URI.create(requestUrl))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload)));
             if (!authToken.isEmpty()) {
@@ -110,18 +114,70 @@ public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
 
             HttpResponse<String> response = CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("Napcat API request failed: " + response.statusCode() + " body=" + response.body());
+                String message = "Napcat API request failed: method=POST url=" + requestUrl + " status=" + response.statusCode() + " body=" + response.body();
+                if (response.statusCode() == 405) {
+                    message += " ; tip: SEIRA_NAPCAT_HTTP_ENDPOINT may be configured as a WS route. Use Napcat HTTP API endpoint instead.";
+                }
+                throw new RuntimeException(message);
             }
         } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new RuntimeException(e);
         }
     }
 
-    private String trimEndpoint(String endpoint) {
-        if (endpoint.endsWith("/")) {
-            return endpoint.substring(0, endpoint.length() - 1);
+    private String buildRequestUrl(String path) {
+        String normalizedPath = path == null ? "" : path.trim();
+        if (normalizedPath.isEmpty()) {
+            return httpEndpoint;
         }
-        return endpoint;
+        String safePath = normalizedPath.startsWith("/") ? normalizedPath.substring(1) : normalizedPath;
+        if (httpEndpoint.endsWith("/")) {
+            return httpEndpoint + safePath;
+        }
+        return httpEndpoint + "/" + safePath;
+    }
+
+    private String normalizeEndpoint(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            throw new IllegalStateException("Missing required env: SEIRA_NAPCAT_HTTP_ENDPOINT");
+        }
+
+        URI uri = URI.create(endpoint.trim());
+        String scheme = uri.getScheme();
+        if (scheme == null || scheme.isBlank()) {
+            throw new IllegalStateException("Invalid SEIRA_NAPCAT_HTTP_ENDPOINT: missing URL scheme");
+        }
+
+        String normalizedScheme = scheme;
+        if ("ws".equalsIgnoreCase(scheme)) {
+            normalizedScheme = "http";
+            LOG.warn("SEIRA_NAPCAT_HTTP_ENDPOINT uses ws://, auto-converting to http://: {}", endpoint);
+        } else if ("wss".equalsIgnoreCase(scheme)) {
+            normalizedScheme = "https";
+            LOG.warn("SEIRA_NAPCAT_HTTP_ENDPOINT uses wss://, auto-converting to https://: {}", endpoint);
+        }
+
+        String normalizedPath = normalizeEndpointPath(uri.getPath());
+        URI normalized = URI.create(normalizedScheme + "://" + uri.getRawAuthority() + normalizedPath);
+        return normalized.toString();
+    }
+
+    private String normalizeEndpointPath(String path) {
+        String rawPath = (path == null || path.isBlank()) ? "" : path.trim();
+        String lower = rawPath.toLowerCase();
+
+        if ("/ws".equals(lower) || "/websocket".equals(lower)) {
+            LOG.warn("SEIRA_NAPCAT_HTTP_ENDPOINT path {} looks like a websocket route; auto-removing the path.", rawPath);
+            return "";
+        }
+
+        if (rawPath.endsWith("/")) {
+            return rawPath.substring(0, rawPath.length() - 1);
+        }
+        return rawPath;
     }
 }
 
