@@ -3,13 +3,16 @@ package xyz.zcraft.platform;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
+import xyz.zcraft.Seira;
 import xyz.zcraft.api.APIHelper;
+import xyz.zcraft.binding.UserBindingStore;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.data.PendingMessage;
 
 import java.net.URI;
 import java.util.Arrays;
+import java.util.List;
 
 public abstract class AbstractCommandGatewayClient extends WebSocketClient implements PlatformGatewayClient {
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
@@ -23,16 +26,21 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     protected void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
-        handleMessageReceived(userId, messageId, rawContent, false);
+        handleMessageReceived(userId, null, userId, messageId, rawContent, false);
     }
 
-    protected void onGroupMessageReceived(String groupId, String messageId, String rawContent) {
-        handleMessageReceived(groupId, messageId, rawContent, true);
+    protected void onGroupMessageReceived(String groupId, String senderUserId, String messageId, String rawContent) {
+        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true);
     }
 
-    private void handleMessageReceived(String targetId, String messageId, String rawContent, boolean groupMessage) {
+    private void handleMessageReceived(String targetId, String groupId, String senderUserId, String messageId, String rawContent, boolean groupMessage) {
         try {
-            PendingMessage pendingMsg = route(rawContent);
+            String platform = Seira.getConfig().platform();
+            if (groupMessage && groupId != null && !groupId.isBlank() && senderUserId != null && !senderUserId.isBlank()) {
+                UserBindingStore.upsertGroupMember(platform, groupId, senderUserId);
+            }
+
+            PendingMessage pendingMsg = route(rawContent, senderUserId, groupId);
             if (pendingMsg == null) {
                 return;
             }
@@ -83,7 +91,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         }
     }
 
-    protected PendingMessage route(String rawContent) {
+    protected PendingMessage route(String rawContent, String senderUserId, String groupId) {
         if (rawContent == null || !rawContent.startsWith(PREFIX)) {
             return null;
         }
@@ -96,15 +104,41 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         String[] parts = body.split("\\s+");
         String command = parts[0].toLowerCase();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
+        String platform = Seira.getConfig().platform();
 
         switch (command) {
+            case "bind" -> {
+                if (senderUserId == null || senderUserId.isBlank()) {
+                    return PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。");
+                }
+                if (args.length != 1) {
+                    return PendingMessage.ofString("用法：/bind <玩家ID>");
+                }
+                Integer uid = parsePositiveInt(args[0]);
+                if (uid == null) {
+                    return PendingMessage.ofString("玩家ID必须是正整数。用法：/bind <玩家ID>");
+                }
+                UserBindingStore.bind(platform, senderUserId, uid);
+                return PendingMessage.ofString("绑定成功，已绑定到玩家ID: " + uid);
+            }
             case "bo", "top" -> {
                 if (args.length == 2) {
-                    int n = Integer.parseInt(args[0]);
-                    int id = Integer.parseInt(args[1]);
+                    Integer n = parsePositiveInt(args[0]);
+                    Integer id = parsePositiveInt(args[1]);
+                    if (n == null || id == null) {
+                        return PendingMessage.ofString("用法：/bo <个数> [玩家ID]");
+                    }
                     return PendingMessage.ofImageBase64(APIHelper.getBoN(n, id));
                 } else if (args.length == 1) {
-                    // TODO implement this variant in command service.
+                    Integer n = parsePositiveInt(args[0]);
+                    if (n == null) {
+                        return PendingMessage.ofString("用法：/bo <个数> [玩家ID]");
+                    }
+                    Integer uid = resolveBoundUid(platform, senderUserId);
+                    if (uid == null) {
+                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                    }
+                    return PendingMessage.ofImageBase64(APIHelper.getBoN(n, uid));
                 } else {
                     return PendingMessage.ofString("用法：/bo <个数> [玩家ID]");
                 }
@@ -117,18 +151,32 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             }
             case "rs" -> {
                 if (args.length == 2) {
-                    int n = Integer.parseInt(args[0]);
-                    int id = Integer.parseInt(args[1]);
+                    Integer n = parsePositiveInt(args[0]);
+                    Integer id = parsePositiveInt(args[1]);
+                    if (n == null || id == null) {
+                        return PendingMessage.ofString("用法：/rs <个数> [玩家ID]");
+                    }
                     return PendingMessage.ofImageBase64(APIHelper.getRecent(n, id));
                 } else if (args.length == 1) {
-                    // TODO implement this variant in command service.
+                    Integer n = parsePositiveInt(args[0]);
+                    if (n == null) {
+                        return PendingMessage.ofString("用法：/rs <个数> [玩家ID]");
+                    }
+                    Integer uid = resolveBoundUid(platform, senderUserId);
+                    if (uid == null) {
+                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                    }
+                    return PendingMessage.ofImageBase64(APIHelper.getRecent(n, uid));
                 } else {
-                    return PendingMessage.ofString("用法：/bo <个数> [玩家ID]");
+                    return PendingMessage.ofString("用法：/rs <个数> [玩家ID]");
                 }
             }
             case "bm" -> {
                 if (args.length == 1) {
-                    int id = Integer.parseInt(args[0]);
+                    Integer id = parsePositiveInt(args[0]);
+                    if (id == null) {
+                        return PendingMessage.ofString("用法：/bm <铺面ID>");
+                    }
                     return PendingMessage.ofImageBase64(APIHelper.getBeatmap(id));
                 } else {
                     return PendingMessage.ofString("用法：/bm <铺面ID>");
@@ -136,11 +184,32 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             }
             case "c" -> {
                 if (args.length == 2) {
-                    int bm = Integer.parseInt(args[0]);
+                    Integer bm = parsePositiveInt(args[0]);
+                    if (bm == null) {
+                        return PendingMessage.ofString("用法：/c <铺面ID> [玩家ID,[玩家ID...]]");
+                    }
                     String uids = args[1];
                     return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uids.split(",")));
                 } else if (args.length == 1) {
-                    // TODO implement this variant in command service.
+                    Integer bm = parsePositiveInt(args[0]);
+                    if (bm == null) {
+                        return PendingMessage.ofString("用法：/c <铺面ID> [玩家ID,[玩家ID...]]");
+                    }
+                    if (groupId != null && !groupId.isBlank()) {
+                        List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
+                        if (groupBoundUids.isEmpty()) {
+                            return PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
+                        }
+                        String[] uidArray = groupBoundUids.stream()
+                                .map(String::valueOf)
+                                .toArray(String[]::new);
+                        return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray));
+                    }
+                    Integer uid = resolveBoundUid(platform, senderUserId);
+                    if (uid == null) {
+                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                    }
+                    return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, new String[]{String.valueOf(uid)}));
                 } else {
                     return PendingMessage.ofString("用法：/c <铺面ID> [玩家ID,[玩家ID...]]");
                 }
@@ -153,7 +222,22 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             }
         }
 
-        return PendingMessage.ofString("未知指令。使用/help获取帮助。");
+    }
+
+    private Integer resolveBoundUid(String platform, String senderUserId) {
+        if (senderUserId == null || senderUserId.isBlank()) {
+            return null;
+        }
+        return UserBindingStore.findBoundUid(platform, senderUserId);
+    }
+
+    private Integer parsePositiveInt(String value) {
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 }
 

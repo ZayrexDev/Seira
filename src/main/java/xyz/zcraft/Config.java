@@ -10,21 +10,24 @@ public record Config(
         String endpoint,
         String napcatWsEndpoint,
         String napcatHttpEndpoint,
-        String napcatToken
+		String napcatToken,
+		String sqlitePath
 ) {
 	private static final int DEFAULT_INTENTS = (1 << 25);
 	private static final String DEFAULT_PLATFORM = "qq";
+  private static final String DEFAULT_SQLITE_PATH = "data/seira.db";
 
 	public static Config fromEnv(Dotenv env) {
 		String platform = getOrDefault(env, "SEIRA_PLATFORM", DEFAULT_PLATFORM).toLowerCase();
-		String appId = "qq".equals(platform) ? require(env, "SEIRA_APPID") : optional(env, "SEIRA_APPID");
-		String appSecret = "qq".equals(platform) ? require(env, "SEIRA_APPSECRET") : optional(env, "SEIRA_APPSECRET");
-		int intents = parseInt(env.get("SEIRA_INTENTS"), DEFAULT_INTENTS);
+		String appId = "qq".equals(platform) ? require(env, "SEIRA_QQ_APPID") : optional(env, "SEIRA_APPID");
+		String appSecret = "qq".equals(platform) ? require(env, "SEIRA_QQ_APPSECRET") : optional(env, "SEIRA_APPSECRET");
+		int intents = parseInt(env.get("SEIRA_QQ_INTENTS"), DEFAULT_INTENTS);
 		String endpoint = require(env, "SEIRA_OSTELLA_ENDPOINT");
 		String napcatWsEndpoint = "napcat".equals(platform) ? require(env, "SEIRA_NAPCAT_WS_ENDPOINT") : optional(env, "SEIRA_NAPCAT_WS_ENDPOINT");
 		String napcatHttpEndpoint = "napcat".equals(platform) ? require(env, "SEIRA_NAPCAT_HTTP_ENDPOINT") : optional(env, "SEIRA_NAPCAT_HTTP_ENDPOINT");
 		String napcatToken = optional(env, "SEIRA_NAPCAT_TOKEN");
-		return new Config(platform, appId, appSecret, intents, endpoint, napcatWsEndpoint, napcatHttpEndpoint, napcatToken);
+		String sqlitePath = getOrDefault(env, "SEIRA_SQLITE_PATH", DEFAULT_SQLITE_PATH);
+		return new Config(platform, appId, appSecret, intents, endpoint, napcatWsEndpoint, napcatHttpEndpoint, napcatToken, sqlitePath);
 	}
 
 	private static String require(Dotenv env, String key) {

@@ -42,3 +42,4 @@ build/
 /test-data/
 /logs/
 /.env
+/data/

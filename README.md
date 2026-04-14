@@ -34,12 +34,13 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 
 `qq` 平台额外必需项：
 
-- `SEIRA_APPID`
-- `SEIRA_APPSECRET`
+- `SEIRA_QQ_APPID`
+- `SEIRA_QQ_APPSECRET`
 
 可选项：
 
-- `SEIRA_INTENTS`（默认 `(1 << 25)`）
+- `SEIRA_QQ_INTENTS`（默认 `(1 << 25)`）
+- `SEIRA_SQLITE_PATH`（默认 `data/seira.db`，用于存储 `/bind` 绑定关系）
 - `SEIRA_NAPCAT_WS_ENDPOINT`（仅 `napcat` 平台必需）
 - `SEIRA_NAPCAT_HTTP_ENDPOINT`（仅 `napcat` 平台必需）
 - `SEIRA_NAPCAT_TOKEN`（Napcat 开启鉴权时填写）
@@ -52,6 +53,7 @@ SEIRA_APPID=your_app_id
 SEIRA_APPSECRET=your_app_secret
 SEIRA_OSTELLA_ENDPOINT=http://localhost:8721
 SEIRA_INTENTS=33554432
+SEIRA_SQLITE_PATH=./data/seira.db
 ```
 
 Napcat 示例：
@@ -62,6 +64,7 @@ SEIRA_OSTELLA_ENDPOINT=http://localhost:8721
 SEIRA_NAPCAT_WS_ENDPOINT=ws://127.0.0.1:3001
 SEIRA_NAPCAT_HTTP_ENDPOINT=http://127.0.0.1:3000
 SEIRA_NAPCAT_TOKEN=
+SEIRA_SQLITE_PATH=./data/seira.db
 ```
 
 ### 3) 构建并启动
@@ -80,8 +83,12 @@ java -jar target/Seira-1.0-SNAPSHOT-jar-with-dependencies.jar
 | `/status` | `/status`                    | 服务状态文本         |
 | `/daily`  | `/daily`                     | 每日挑战信息         |
 | `/mp`     | `/mp`                        | 多人房间列表         |
+| `/bind`   | `/bind <uid>`               | 绑定当前用户到 osu uid |
 | `/bo`     | `/bo <n> <uid>`              | Best 成绩图片      |
 | `/top`    | `/top <n> <uid>`             | 同 `/bo`        |
 | `/rs`     | `/rs <n> <uid>`              | Recent 成绩图片    |
 | `/c`      | `/c <bm> <uid1>[,<uid2>]...` | 生成指定用户的特定铺面排行榜 |
+
+绑定后可省略 uid：`/bo <n>`、`/rs <n>`。
+在群聊中，`/c <bm>` 会默认使用该群里已绑定过的所有玩家 uid；私聊中 `/c <bm>` 使用你自己的绑定 uid。
 

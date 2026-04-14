@@ -4,6 +4,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.binding.UserBindingStore;
 import xyz.zcraft.platform.BotPlatformAdapter;
 import xyz.zcraft.platform.BotPlatformAdapters;
 import xyz.zcraft.platform.PlatformGatewayClient;
@@ -26,6 +27,7 @@ public class Seira {
         LOG.info("Loading .env ...");
         final Dotenv env = Dotenv.load();
         config = Config.fromEnv(env);
+        UserBindingStore.init(config.sqlitePath());
         platformAdapter = BotPlatformAdapters.create(config);
         LOG.info("Selected platform adapter: {}", config.platform());
 

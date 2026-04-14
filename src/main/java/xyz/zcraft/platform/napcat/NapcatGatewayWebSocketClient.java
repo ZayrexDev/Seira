@@ -56,7 +56,8 @@ public class NapcatGatewayWebSocketClient extends AbstractCommandGatewayClient {
 
         if ("group".equals(messageType) && payload.has("group_id")) {
             String groupId = payload.get("group_id").getAsString();
-            onGroupMessageReceived(groupId, messageId, content);
+            String userId = payload.has("user_id") ? payload.get("user_id").getAsString() : "";
+            onGroupMessageReceived(groupId, userId, messageId, content);
         }
     }
 
