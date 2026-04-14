@@ -214,6 +214,23 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return PendingMessage.ofString("用法：/c <铺面ID> [玩家ID,[玩家ID...]]");
                 }
             }
+            case "lb" -> {
+                if (args.length == 0) {
+                    if (groupId != null && !groupId.isBlank()) {
+                        List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
+                        if (groupBoundUids.isEmpty()) {
+                            return PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
+                        }
+                        String[] uidArray = groupBoundUids.stream()
+                                .map(String::valueOf)
+                                .toArray(String[]::new);
+                        return PendingMessage.ofImageBase64(APIHelper.getLeaderboard(uidArray));
+                    }
+                    return PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
+                } else {
+                    return PendingMessage.ofString("用法：/lb");
+                }
+            }
             case "status" -> {
                 return PendingMessage.ofString("服务器状态：正常");
             }

@@ -51,6 +51,21 @@ public class APIHelper {
         }
     }
 
+    public static String getLeaderboard(String[] uids) {
+        String uidsParam = String.join(",", uids);
+        try {
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/lb?" + "u=" + uidsParam))
+                    .GET()
+                    .build();
+            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+
+            return Base64.getEncoder().encodeToString(imageBytes);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static String getDaily() {
         try {
             HttpRequest request = HttpRequest.newBuilder()
