@@ -36,11 +36,11 @@ public class APIHelper {
         }
     }
 
-    public static String getGroupLeaderboard(int bm, String[] uids) {
+    public static String getGroupLeaderboard(int m, String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/pk?" + "bm=" + bm + "&u=" + uidsParam))
+                    .uri(URI.create(ENDPOINT + "/pk?" + "m=" + m + "&u=" + uidsParam))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
@@ -131,10 +131,10 @@ public class APIHelper {
         }
     }
 
-    public static String getBeatmap(int uid) {
+    public static String getBeatmap(int m) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/bm?" + "&bm=" + uid))
+                    .uri(URI.create(ENDPOINT + "/m?" + "&m=" + m))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
