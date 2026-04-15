@@ -7,6 +7,7 @@ import org.apache.logging.log4j.Logger;
 import org.java_websocket.handshake.ServerHandshake;
 import xyz.zcraft.platform.AbstractCommandGatewayClient;
 import xyz.zcraft.platform.PlatformMessageSender;
+import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
 
@@ -31,36 +32,38 @@ public class NapcatGatewayWebSocketClient extends AbstractCommandGatewayClient {
 
     @Override
     public void onMessage(String rawMessage) {
-        JsonObject payload = GSON.fromJson(rawMessage, JsonObject.class);
-        if (payload == null || !payload.has("post_type")) {
-            return;
-        }
+        ThreadHelper.run(() -> {
+            JsonObject payload = GSON.fromJson(rawMessage, JsonObject.class);
+            if (payload == null || !payload.has("post_type")) {
+                return;
+            }
 
-        if (!"message".equals(payload.get("post_type").getAsString())) {
-            return;
-        }
+            if (!"message".equals(payload.get("post_type").getAsString())) {
+                return;
+            }
 
-        if (!payload.has("message_type")) {
-            return;
-        }
+            if (!payload.has("message_type")) {
+                return;
+            }
 
-        String messageType = payload.get("message_type").getAsString();
-        String messageId = payload.has("message_id") ? payload.get("message_id").getAsString() : "";
-        String content = payload.has("raw_message") ? payload.get("raw_message").getAsString() : "";
+            String messageType = payload.get("message_type").getAsString();
+            String messageId = payload.has("message_id") ? payload.get("message_id").getAsString() : "";
+            String content = payload.has("raw_message") ? payload.get("raw_message").getAsString() : "";
 
-        if ("private".equals(messageType) && payload.has("user_id")) {
-            String userId = payload.get("user_id").getAsString();
-            LOG.info("PRIVA {} - {}", userId, content);
-            onPrivateMessageReceived(userId, messageId, content);
-            return;
-        }
+            if ("private".equals(messageType) && payload.has("user_id")) {
+                String userId = payload.get("user_id").getAsString();
+                LOG.info("PRIVA {} - {}", userId, content);
+                onPrivateMessageReceived(userId, messageId, content);
+                return;
+            }
 
-        if ("group".equals(messageType) && payload.has("group_id")) {
-            String groupId = payload.get("group_id").getAsString();
-            String userId = payload.has("user_id") ? payload.get("user_id").getAsString() : "";
-            LOG.info("GROUP {} - {}", groupId, content);
-            onGroupMessageReceived(groupId, userId, messageId, content);
-        }
+            if ("group".equals(messageType) && payload.has("group_id")) {
+                String groupId = payload.get("group_id").getAsString();
+                String userId = payload.has("user_id") ? payload.get("user_id").getAsString() : "";
+                LOG.info("GROUP {} - {}", groupId, content);
+                onGroupMessageReceived(groupId, userId, messageId, content);
+            }
+        });
     }
 
     @Override

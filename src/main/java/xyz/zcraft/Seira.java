@@ -10,6 +10,7 @@ import xyz.zcraft.platform.BotPlatformAdapters;
 import xyz.zcraft.platform.PlatformGatewayClient;
 import xyz.zcraft.platform.PlatformMessageSender;
 import xyz.zcraft.util.AccessToken;
+import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
 import java.util.Timer;
@@ -17,10 +18,10 @@ import java.util.TimerTask;
 
 public class Seira {
     private static final Logger LOG = LogManager.getLogger(Seira.class);
+    private static final Timer timer = new Timer("access-token-renewal", true);
     @Getter
     private static Config config;
     private static AccessToken accessToken;
-    private static final Timer timer = new Timer("access-token-renewal", true);
     private static BotPlatformAdapter platformAdapter;
 
     static void main() {
@@ -35,6 +36,8 @@ public class Seira {
         renewAccessToken();
 
         PlatformMessageSender messageSender = platformAdapter.createMessageSender(() -> accessToken);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(ThreadHelper::close));
 
         while (true) {
             try {

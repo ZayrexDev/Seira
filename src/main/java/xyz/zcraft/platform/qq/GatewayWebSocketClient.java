@@ -11,6 +11,7 @@ import xyz.zcraft.Config;
 import xyz.zcraft.platform.AbstractCommandGatewayClient;
 import xyz.zcraft.platform.PlatformMessageSender;
 import xyz.zcraft.util.AccessToken;
+import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
 import java.util.concurrent.Executors;
@@ -46,20 +47,22 @@ public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
 
     @Override
     public void onMessage(String message) {
-        JsonObject payload = gson.fromJson(message, JsonObject.class);
-        updateSequence(payload.get("s"));
+        ThreadHelper.run(() -> {
+            JsonObject payload = gson.fromJson(message, JsonObject.class);
+            updateSequence(payload.get("s"));
 
-        int op = payload.get("op").getAsInt();
-        switch (op) {
-            case 10 -> onHello(payload.getAsJsonObject("d"));
-            case 11 -> heartbeatAcked = true;
-            case 0 -> onDispatch(payload);
-            case 7, 9 -> {
-                LOG.warn("Gateway requested reconnect/invalid session. closing current connection");
-                close();
+            int op = payload.get("op").getAsInt();
+            switch (op) {
+                case 10 -> onHello(payload.getAsJsonObject("d"));
+                case 11 -> heartbeatAcked = true;
+                case 0 -> onDispatch(payload);
+                case 7, 9 -> {
+                    LOG.warn("Gateway requested reconnect/invalid session. closing current connection");
+                    close();
+                }
+                default -> LOG.debug("Ignored opcode {}", op);
             }
-            default -> LOG.debug("Ignored opcode {}", op);
-        }
+        });
     }
 
     @Override
