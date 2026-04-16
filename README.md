@@ -11,10 +11,13 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 <img width="900" alt="image" src="https://github.com/user-attachments/assets/f4ff6ac7-b241-4c6b-956e-9c258c27faa7" />
 
 ### 铺面信息
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/0b8c51aa-ecf7-4e9e-9f67-327ce53ad9e3" />
+<img width="400" alt="88dee933d3192634cd7fe917b9906857" src="https://github.com/user-attachments/assets/7eea1908-9821-469d-873e-c9ea63f2ef78" />
 
 ### 排行榜
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/4a229779-c674-4172-8d6b-6accdabb5a5e" />
+<img width="400" alt="1f9303d67a65a32c0d4ed531bd48eaad" src="https://github.com/user-attachments/assets/95d41c25-ce01-4587-a8f9-9450c780d8f8" />
+
+### 铺面集信息
+<img width="400" alt="03403d77bf6c381b67d17f89da0d82f8" src="https://github.com/user-attachments/assets/be48925b-1fe4-4b8b-8890-41a34763560c" />
 
 ## 快速开始
 
@@ -45,14 +48,14 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 - `SEIRA_NAPCAT_HTTP_ENDPOINT`（仅 `napcat` 平台必需）
 - `SEIRA_NAPCAT_TOKEN`（Napcat 开启鉴权时填写）
 
-示例：
+QQ 示例：
 
 ```env
 SEIRA_PLATFORM=qq
-SEIRA_APPID=your_app_id
-SEIRA_APPSECRET=your_app_secret
+SEIRA_QQ_APPID=your_app_id
+SEIRA_QQ_APPSECRET=your_app_secret
 SEIRA_OSTELLA_ENDPOINT=http://localhost:8721
-SEIRA_INTENTS=33554432
+SEIRA_QQ_INTENTS=33554432
 SEIRA_SQLITE_PATH=./data/seira.db
 ```
 
@@ -67,28 +70,29 @@ SEIRA_NAPCAT_TOKEN=
 SEIRA_SQLITE_PATH=./data/seira.db
 ```
 
-### 3) 构建并启动
+### 3) 启动
 
 ```shell
-mvn clean package
-java -jar target/Seira-1.0-SNAPSHOT-jar-with-dependencies.jar
+mvn -U clean compile exec:java
 ```
 
 ## 常用命令
 
 > 所有命令都以 `/` 开头。
 
-| 命令        | 用法                           | 结果             |
-|-----------|------------------------------|----------------|
-| `/status` | `/status`                    | 服务状态文本         |
-| `/daily`  | `/daily`                     | 每日挑战信息         |
-| `/mp`     | `/mp`                        | 多人房间列表         |
-| `/bind`   | `/bind <uid>`               | 绑定当前用户到 osu uid |
-| `/bo`     | `/bo <n> <uid>`              | Best 成绩图片      |
-| `/top`    | `/top <n> <uid>`             | 同 `/bo`        |
-| `/rs`     | `/rs <n> <uid>`              | Recent 成绩图片    |
-| `/c`      | `/c <bm> <uid1>[,<uid2>]...` | 生成指定用户的特定铺面排行榜 |
+| 命令        | 用法                           | 结果               |
+|-----------|------------------------------|------------------|
+| `/status` | `/status`                    | 服务状态文本           |
+| `/daily`  | `/daily`                     | 每日挑战信息           |
+| `/mp`     | `/mp`                        | 多人房间列表           |
+| `/bind`   | `/bind <uid>`                | 绑定当前用户到 osu uid  |
+| `/bo`     | `/bo <n> <uid>`              | Best 成绩图片        |
+| `/top`    | `/top <n> <uid>`             | 同 `/bo`          |
+| `/rs`     | `/rs <n> <uid>`              | Recent 成绩图片      |
+| `/c`      | `/c <bm> <uid1>[,<uid2>]...` | 生成指定用户的特定铺面排行榜   |
+| `/lb`     | `/lb [bm]`                   | `/c` 的别名（默认使用绑定） |
 
 绑定后可省略 uid：`/bo <n>`、`/rs <n>`。
 在群聊中，`/c <bm>` 会默认使用该群里已绑定过的所有玩家 uid；私聊中 `/c <bm>` 使用你自己的绑定 uid。
+另外：`/c` 或 `/lb` 不带参数时，会基于默认绑定 uid 生成综合排行榜（群聊=本群绑定用户，私聊=你自己的绑定 uid）。
 

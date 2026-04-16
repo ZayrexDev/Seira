@@ -193,14 +193,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (args.length == 1) {
                     Integer id = parsePositiveInt(args[0]);
                     if (id == null) {
-                        return PendingMessage.ofString("用法：/ms <铺面ID>");
+                        return PendingMessage.ofString("用法：/ms <铺面集ID>");
                     }
                     return PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(id));
                 } else {
-                    return PendingMessage.ofString("用法：/ms <铺面ID>");
+                    return PendingMessage.ofString("用法：/ms <铺面集ID>");
                 }
             }
-            case "lb" -> {
+            case "lb", "c" -> {
                 if (args.length == 0) {
                     if (groupId != null && !groupId.isBlank()) {
                         List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
@@ -211,13 +211,16 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                                 .map(String::valueOf)
                                 .toArray(String[]::new);
                         return PendingMessage.ofImageBase64(APIHelper.getLeaderboard(uidArray));
-                    } else {
-                        return PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
                     }
+                    Integer uid = resolveBoundUid(platform, senderUserId);
+                    if (uid == null) {
+                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                    }
+                    return PendingMessage.ofImageBase64(APIHelper.getLeaderboard(new String[]{String.valueOf(uid)}));
                 } else if (args.length == 1) {
                     Integer bm = parsePositiveInt(args[0]);
                     if (bm == null) {
-                        return PendingMessage.ofString("用法：/lb [铺面ID]");
+                        return PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
                     }
                     if (groupId != null && !groupId.isBlank()) {
                         List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
@@ -228,11 +231,32 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                                 .map(String::valueOf)
                                 .toArray(String[]::new);
                         return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray));
-                    } else {
-                        return PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
                     }
+                    Integer uid = resolveBoundUid(platform, senderUserId);
+                    if (uid == null) {
+                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                    }
+                    return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, new String[]{String.valueOf(uid)}));
+                } else if (args.length == 2) {
+                    Integer bm = parsePositiveInt(args[0]);
+                    if (bm == null) {
+                        return PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
+                    }
+                    String[] uidTokens = args[1].split(",");
+                    if (uidTokens.length == 0) {
+                        return PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
+                    }
+                    String[] uidArray = new String[uidTokens.length];
+                    for (int i = 0; i < uidTokens.length; i++) {
+                        Integer uid = parsePositiveInt(uidTokens[i].trim());
+                        if (uid == null) {
+                            return PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
+                        }
+                        uidArray[i] = String.valueOf(uid);
+                    }
+                    return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray));
                 } else {
-                    return PendingMessage.ofString("用法：/lb [铺面ID]");
+                    return PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
                 }
             }
             case "status" -> {
@@ -245,7 +269,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         /bo <个数> [玩家ID] - 获取BoN图谱
                         /rs <个数> [玩家ID] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
-                        /lb [铺面ID] - 获取排行榜图谱（可选铺面ID）
+                        /ms <铺面集ID> - 获取铺面集图谱
+                        /c <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
+                        /lb [铺面ID] - /c 的别名（省略参数时走绑定用户）
                         /daily - 获取每日挑战
                         /mp - 获取多人房间列表
                         /status - 获取服务器状态
