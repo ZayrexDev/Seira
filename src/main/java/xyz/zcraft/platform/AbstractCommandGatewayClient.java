@@ -176,17 +176,28 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     Integer id = parsePositiveInt(args[0]);
                     String mod = args[1];
                     if (id == null) {
-                        return PendingMessage.ofString("用法：/m <铺面ID> [+Mod]");
+                        return PendingMessage.ofString("用法：/m <铺面ID> [Mod]");
                     }
                     return PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, mod));
                 } else if (args.length == 1) {
                     Integer id = parsePositiveInt(args[0]);
                     if (id == null) {
-                        return PendingMessage.ofString("用法：/m <铺面ID> [+Mod]");
+                        return PendingMessage.ofString("用法：/m <铺面ID> [Mod]");
                     }
                     return PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, null));
                 } else {
-                    return PendingMessage.ofString("用法：/m <铺面ID> [+Mod]");
+                    return PendingMessage.ofString("用法：/m <铺面ID> [Mod]");
+                }
+            }
+            case "ms" -> {
+                if (args.length == 1) {
+                    Integer id = parsePositiveInt(args[0]);
+                    if (id == null) {
+                        return PendingMessage.ofString("用法：/ms <铺面ID>");
+                    }
+                    return PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(id));
+                } else {
+                    return PendingMessage.ofString("用法：/ms <铺面ID>");
                 }
             }
             case "lb" -> {

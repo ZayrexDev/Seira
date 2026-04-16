@@ -144,4 +144,18 @@ public class APIHelper {
             throw new RuntimeException(e);
         }
     }
+
+    public static String getBeatmapSet(int m) {
+        try {
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/ms?" + "?ms=" + m))
+                    .GET()
+                    .build();
+            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+
+            return Base64.getEncoder().encodeToString(imageBytes);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
