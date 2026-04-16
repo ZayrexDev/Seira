@@ -148,7 +148,7 @@ public class APIHelper {
     public static String getBeatmapSet(int m) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/ms?" + "?ms=" + m))
+                    .uri(URI.create(ENDPOINT + "/ms?" + "ms=" + m))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
