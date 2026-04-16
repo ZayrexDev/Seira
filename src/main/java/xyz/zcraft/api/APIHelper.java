@@ -131,10 +131,10 @@ public class APIHelper {
         }
     }
 
-    public static String getBeatmap(int m) {
+    public static String getBeatmap(int m, String mod) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/m?" + "&m=" + m))
+                    .uri(URI.create(ENDPOINT + "/m?" + "&m=" + m + (mod == null || mod.isBlank() ? "" : "&mod=" + mod)))
                     .GET()
                     .build();
             byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
