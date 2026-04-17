@@ -201,13 +201,13 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         String[] uidArray = groupBoundUids.stream()
                                 .map(String::valueOf)
                                 .toArray(String[]::new);
-                        return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray)));
+                        return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray)));
                     }
                     Integer uid = resolveBoundUid(platform, senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
-                    return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, new String[]{String.valueOf(uid)})));
+                    return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, new String[]{String.valueOf(uid)})));
                 } else if (args.length == 2) {
                     Integer bm = parsePositiveInt(args[0]);
                     if (bm == null) {
@@ -225,7 +225,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         }
                         uidArray[i] = String.valueOf(uid);
                     }
-                    return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray)));
+                    return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray)));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
                 }
