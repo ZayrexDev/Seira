@@ -9,6 +9,7 @@ import xyz.zcraft.binding.UserBindingStore;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.data.PendingMessage;
+import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
 import java.util.Arrays;
@@ -17,6 +18,7 @@ import java.util.List;
 public abstract class AbstractCommandGatewayClient extends WebSocketClient implements PlatformGatewayClient {
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
     private static final String PREFIX = "/";
+    private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
 
     private final PlatformMessageSender messageSender;
 
@@ -40,65 +42,31 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 UserBindingStore.upsertGroupMember(platform, groupId, senderUserId);
             }
 
-            PendingMessage pendingMsg = route(rawContent, senderUserId, groupId);
-            if (pendingMsg == null) {
+            RouteDecision routeDecision = route(rawContent, senderUserId, groupId);
+            if (routeDecision == null) {
                 return;
             }
 
-            Message message = new Message();
-            message.setContent(pendingMsg.getContent());
-            message.setMsgType(pendingMsg.getMsgType());
-            message.setMsgId(messageId);
+            sendOutboundMessage(targetId, messageId, groupMessage, routeDecision.initialMessage());
 
-            if (pendingMsg.getFileUrl() != null) {
-                FileInfo fileInfo = groupMessage
-                        ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
-                        : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
-                if (fileInfo == null) {
-                    LOG.error("Failed to upload media for message {}", messageId);
-                    return;
-                }
-                LOG.info("Media uploaded for message {}", messageId);
-                message.setMedia(fileInfo);
-            } else if (pendingMsg.getFileBase64() != null) {
-                FileInfo fileInfo = groupMessage
-                        ? messageSender.uploadGroupMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64())
-                        : messageSender.uploadPrivateMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
-                if (fileInfo == null) {
-                    LOG.error("Failed to upload base64 media for message {}", messageId);
-                    return;
-                }
-                LOG.info("Base64 media uploaded for message {}", messageId);
-                message.setMedia(fileInfo);
-            }
-
-            if (groupMessage) {
-                messageSender.sendGroupMessage(targetId, message);
-            } else {
-                messageSender.sendPrivateMessage(targetId, message);
+            ApiTask apiTask = routeDecision.apiTask();
+            if (apiTask != null) {
+                ThreadHelper.run(() -> processApiTask(targetId, messageId, groupMessage, apiTask));
             }
         } catch (Exception e) {
-            Message message = new Message();
-            message.setContent("处理指令时发生错误，请稍后再试。");
-            message.setMsgType(0);
-            message.setMsgId(messageId);
-            if (groupMessage) {
-                messageSender.sendGroupMessage(targetId, message);
-            } else {
-                messageSender.sendPrivateMessage(targetId, message);
-            }
+            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"));
             LOG.error("Failed to process inbound message {}", messageId, e);
         }
     }
 
-    protected PendingMessage route(String rawContent, String senderUserId, String groupId) {
+    protected RouteDecision route(String rawContent, String senderUserId, String groupId) {
         if (rawContent == null || !rawContent.startsWith(PREFIX)) {
             return null;
         }
 
         String body = rawContent.substring(PREFIX.length()).trim();
         if (body.isEmpty()) {
-            return PendingMessage.ofString("请输入指令。使用/help获取帮助。");
+            return RouteDecision.sync(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
         }
 
         String[] parts = body.split("\\s+");
@@ -109,66 +77,66 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         switch (command) {
             case "bind" -> {
                 if (senderUserId == null || senderUserId.isBlank()) {
-                    return PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。");
+                    return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
                 }
                 if (args.length != 1) {
-                    return PendingMessage.ofString("用法：/bind <玩家ID>");
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/bind <玩家ID>"));
                 }
                 Integer uid = parsePositiveInt(args[0]);
                 if (uid == null) {
-                    return PendingMessage.ofString("玩家ID必须是正整数。用法：/bind <玩家ID>");
+                    return RouteDecision.sync(PendingMessage.ofString("玩家ID必须是正整数。用法：/bind <玩家ID>"));
                 }
                 UserBindingStore.bind(platform, senderUserId, uid);
-                return PendingMessage.ofString("绑定成功，已绑定到玩家ID: " + uid);
+                return RouteDecision.sync(PendingMessage.ofString("绑定成功，已绑定到玩家ID: " + uid));
             }
             case "bo", "top" -> {
                 if (args.length == 2) {
                     Integer n = parsePositiveInt(args[0]);
                     Integer id = parsePositiveInt(args[1]);
                     if (n == null || id == null) {
-                        return PendingMessage.ofString("用法：/bo <个数> [玩家ID]");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID]"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getBoN(n, id));
+                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getBoN(n, id)));
                 } else if (args.length == 1) {
                     Integer n = parsePositiveInt(args[0]);
                     if (n == null) {
-                        return PendingMessage.ofString("用法：/bo <个数> [玩家ID]");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID]"));
                     }
                     Integer uid = resolveBoundUid(platform, senderUserId);
                     if (uid == null) {
-                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                        return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getBoN(n, uid));
+                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getBoN(n, uid)));
                 } else {
-                    return PendingMessage.ofString("用法：/bo <个数> [玩家ID]");
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID]"));
                 }
             }
             case "daily" -> {
-                return PendingMessage.ofString(APIHelper.getDaily());
+                return queueApiRequest("daily", () -> PendingMessage.ofString(APIHelper.getDaily()));
             }
             case "mp" -> {
-                return PendingMessage.ofString(APIHelper.getMultiplayerRooms());
+                return queueApiRequest("mp", () -> PendingMessage.ofString(APIHelper.getMultiplayerRooms()));
             }
             case "rs" -> {
                 if (args.length == 2) {
                     Integer n = parsePositiveInt(args[0]);
                     Integer id = parsePositiveInt(args[1]);
                     if (n == null || id == null) {
-                        return PendingMessage.ofString("用法：/rs <个数> [玩家ID]");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID]"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getRecent(n, id));
+                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getRecent(n, id)));
                 } else if (args.length == 1) {
                     Integer n = parsePositiveInt(args[0]);
                     if (n == null) {
-                        return PendingMessage.ofString("用法：/rs <个数> [玩家ID]");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID]"));
                     }
                     Integer uid = resolveBoundUid(platform, senderUserId);
                     if (uid == null) {
-                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                        return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getRecent(n, uid));
+                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getRecent(n, uid)));
                 } else {
-                    return PendingMessage.ofString("用法：/rs <个数> [玩家ID]");
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID]"));
                 }
             }
             case "m" -> {
@@ -176,28 +144,28 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     Integer id = parsePositiveInt(args[0]);
                     String mod = args[1];
                     if (id == null) {
-                        return PendingMessage.ofString("用法：/m <铺面ID> [Mod]");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, mod));
+                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, mod)));
                 } else if (args.length == 1) {
                     Integer id = parsePositiveInt(args[0]);
                     if (id == null) {
-                        return PendingMessage.ofString("用法：/m <铺面ID> [Mod]");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, null));
+                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, null)));
                 } else {
-                    return PendingMessage.ofString("用法：/m <铺面ID> [Mod]");
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
                 }
             }
             case "ms" -> {
                 if (args.length == 1) {
                     Integer id = parsePositiveInt(args[0]);
                     if (id == null) {
-                        return PendingMessage.ofString("用法：/ms <铺面集ID>");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID>"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(id));
+                    return queueApiRequest("ms", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(id)));
                 } else {
-                    return PendingMessage.ofString("用法：/ms <铺面集ID>");
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID>"));
                 }
             }
             case "lb", "c" -> {
@@ -205,65 +173,65 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     if (groupId != null && !groupId.isBlank()) {
                         List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
                         if (groupBoundUids.isEmpty()) {
-                            return PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
+                            return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                         }
                         String[] uidArray = groupBoundUids.stream()
                                 .map(String::valueOf)
                                 .toArray(String[]::new);
-                        return PendingMessage.ofImageBase64(APIHelper.getLeaderboard(uidArray));
+                        return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getLeaderboard(uidArray)));
                     }
                     Integer uid = resolveBoundUid(platform, senderUserId);
                     if (uid == null) {
-                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                        return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getLeaderboard(new String[]{String.valueOf(uid)}));
+                    return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getLeaderboard(new String[]{String.valueOf(uid)})));
                 } else if (args.length == 1) {
                     Integer bm = parsePositiveInt(args[0]);
                     if (bm == null) {
-                        return PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
                     }
                     if (groupId != null && !groupId.isBlank()) {
                         List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
                         if (groupBoundUids.isEmpty()) {
-                            return PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
+                            return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                         }
                         String[] uidArray = groupBoundUids.stream()
                                 .map(String::valueOf)
                                 .toArray(String[]::new);
-                        return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray));
+                        return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray)));
                     }
                     Integer uid = resolveBoundUid(platform, senderUserId);
                     if (uid == null) {
-                        return PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>");
+                        return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, new String[]{String.valueOf(uid)}));
+                    return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, new String[]{String.valueOf(uid)})));
                 } else if (args.length == 2) {
                     Integer bm = parsePositiveInt(args[0]);
                     if (bm == null) {
-                        return PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
                     }
                     String[] uidTokens = args[1].split(",");
                     if (uidTokens.length == 0) {
-                        return PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
+                        return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
                     }
                     String[] uidArray = new String[uidTokens.length];
                     for (int i = 0; i < uidTokens.length; i++) {
                         Integer uid = parsePositiveInt(uidTokens[i].trim());
                         if (uid == null) {
-                            return PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
+                            return RouteDecision.sync(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
                         }
                         uidArray[i] = String.valueOf(uid);
                     }
-                    return PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray));
+                    return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray)));
                 } else {
-                    return PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]");
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
                 }
             }
             case "status" -> {
-                return PendingMessage.ofString("服务器状态：正常");
+                return RouteDecision.sync(PendingMessage.ofString("服务器状态：正常"));
             }
             case "help" -> {
-                return PendingMessage.ofString("""
+                return RouteDecision.sync(PendingMessage.ofString("""
                         可用指令：
                         /bind <玩家ID> - 绑定你的玩家ID
                         /bo <个数> [玩家ID] - 获取BoN图谱
@@ -276,13 +244,88 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         /mp - 获取多人房间列表
                         /status - 获取服务器状态
                         /help - 显示此帮助信息
-                        """);
+                        """));
             }
             default -> {
-                return PendingMessage.ofString("未知指令。使用/help获取帮助。");
+                return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
             }
         }
 
+    }
+
+    private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
+        long estimatedSeconds = API_REQUEST_STATS.estimateAndEnqueue(requestType);
+        PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
+        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor));
+    }
+
+    private void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask) {
+        long startedAt = System.nanoTime();
+        try {
+            PendingMessage response = apiTask.executor().execute();
+            if (response != null) {
+                sendOutboundMessage(targetId, messageId, groupMessage, response);
+            }
+        } catch (Exception e) {
+            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("请求处理失败，请稍后再试。"));
+            LOG.error("Failed to execute API task for message {}", messageId, e);
+        } finally {
+            long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
+            API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
+        }
+    }
+
+    private void sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg) {
+        Message message = new Message();
+        message.setContent(pendingMsg.getContent());
+        message.setMsgType(pendingMsg.getMsgType());
+        message.setMsgId(messageId);
+
+        if (pendingMsg.getFileUrl() != null) {
+            FileInfo fileInfo = groupMessage
+                    ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
+                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
+            if (fileInfo == null) {
+                LOG.error("Failed to upload media for message {}", messageId);
+                return;
+            }
+            LOG.info("Media uploaded for message {}", messageId);
+            message.setMedia(fileInfo);
+        } else if (pendingMsg.getFileBase64() != null) {
+            FileInfo fileInfo = groupMessage
+                    ? messageSender.uploadGroupMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64())
+                    : messageSender.uploadPrivateMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
+            if (fileInfo == null) {
+                LOG.error("Failed to upload base64 media for message {}", messageId);
+                return;
+            }
+            LOG.info("Base64 media uploaded for message {}", messageId);
+            message.setMedia(fileInfo);
+        }
+
+        if (groupMessage) {
+            messageSender.sendGroupMessage(targetId, message);
+        } else {
+            messageSender.sendPrivateMessage(targetId, message);
+        }
+    }
+
+    @FunctionalInterface
+    private interface ApiTaskExecutor {
+        PendingMessage execute();
+    }
+
+    private record ApiTask(String requestType, ApiTaskExecutor executor) {
+    }
+
+    protected record RouteDecision(PendingMessage initialMessage, ApiTask apiTask) {
+        private static RouteDecision sync(PendingMessage message) {
+            return new RouteDecision(message, null);
+        }
+
+        private static RouteDecision async(PendingMessage message, ApiTask apiTask) {
+            return new RouteDecision(message, apiTask);
+        }
     }
 
     private Integer resolveBoundUid(String platform, String senderUserId) {

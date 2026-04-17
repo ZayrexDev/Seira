@@ -11,11 +11,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Base64;
 
 public class APIHelper {
     private static final String ENDPOINT;
-    private static final HttpClient CLIENT = HttpClient.newBuilder().build();
+    private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
 
     static {
