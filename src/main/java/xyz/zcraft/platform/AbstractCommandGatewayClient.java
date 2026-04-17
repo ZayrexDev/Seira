@@ -14,6 +14,7 @@ import xyz.zcraft.util.ThreadHelper;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class AbstractCommandGatewayClient extends WebSocketClient implements PlatformGatewayClient {
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
@@ -36,6 +37,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private void handleMessageReceived(String targetId, String groupId, String senderUserId, String messageId, String rawContent, boolean groupMessage) {
+        LOG.info("Received {} message {} from {}: {}", groupMessage ? "group" : "private", messageId, senderUserId, rawContent);
+        AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
             String platform = Seira.getConfig().platform();
             if (groupMessage && groupId != null && !groupId.isBlank() && senderUserId != null && !senderUserId.isBlank()) {
@@ -47,14 +50,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 return;
             }
 
-            sendOutboundMessage(targetId, messageId, groupMessage, routeDecision.initialMessage());
+            sendOutboundMessage(targetId, messageId, groupMessage, routeDecision.initialMessage(), messageSeqCounter);
 
             ApiTask apiTask = routeDecision.apiTask();
             if (apiTask != null) {
-                ThreadHelper.run(() -> processApiTask(targetId, messageId, groupMessage, apiTask));
+                ThreadHelper.run(() -> processApiTask(targetId, messageId, groupMessage, apiTask, messageSeqCounter));
             }
         } catch (Exception e) {
-            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"));
+            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"), messageSeqCounter);
             LOG.error("Failed to process inbound message {}", messageId, e);
         }
     }
@@ -259,15 +262,15 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor));
     }
 
-    private void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask) {
+    private void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
         long startedAt = System.nanoTime();
         try {
             PendingMessage response = apiTask.executor().execute();
             if (response != null) {
-                sendOutboundMessage(targetId, messageId, groupMessage, response);
+                sendOutboundMessage(targetId, messageId, groupMessage, response, messageSeqCounter);
             }
         } catch (Exception e) {
-            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("请求处理失败，请稍后再试。"));
+            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("请求处理失败，请稍后再试。"), messageSeqCounter);
             LOG.error("Failed to execute API task for message {}", messageId, e);
         } finally {
             long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
@@ -275,11 +278,12 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         }
     }
 
-    private void sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg) {
+    private void sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
         Message message = new Message();
         message.setContent(pendingMsg.getContent());
         message.setMsgType(pendingMsg.getMsgType());
         message.setMsgId(messageId);
+        message.setMsgSeq(messageSeqCounter.getAndIncrement());
 
         if (pendingMsg.getFileUrl() != null) {
             FileInfo fileInfo = groupMessage

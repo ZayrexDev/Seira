@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ApiRequestStats {
     private static final int WINDOW_SIZE = 10;
-    private static final long DEFAULT_COST_MILLIS = 3000L;
+    private static final long DEFAULT_COST_MILLIS = 10000L;
 
     private final ConcurrentHashMap<String, StatsEntry> statsByType = new ConcurrentHashMap<>();
 
