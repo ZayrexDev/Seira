@@ -83,6 +83,19 @@ public final class UserBindingStore {
         return null;
     }
 
+    public static boolean unbind(String platform, String platformUserId) {
+        ensureInitialized();
+        String sql = "DELETE FROM user_bindings WHERE platform = ? AND platform_user_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, platform);
+            statement.setString(2, platformUserId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete binding", e);
+        }
+    }
+
     public static void upsertGroupMember(String platform, String groupId, String platformUserId) {
         ensureInitialized();
         long now = System.currentTimeMillis();

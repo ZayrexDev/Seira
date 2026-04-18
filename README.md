@@ -86,6 +86,7 @@ mvn -U clean compile exec:java
 | `/daily`  | `/daily`                     | 每日挑战信息           |
 | `/mp`     | `/mp`                        | 多人房间列表           |
 | `/bind`   | `/bind <uid>`                | 绑定当前用户到 osu uid  |
+| `/unbind` | `/unbind`                    | 解除当前用户的 uid 绑定   |
 | `/bo`     | `/bo <n> <uid>`              | Best 成绩图片        |
 | `/top`    | `/top <n> <uid>`             | 同 `/bo`          |
 | `/rs`     | `/rs <n> <uid>`              | Recent 成绩图片      |

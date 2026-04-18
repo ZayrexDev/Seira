@@ -92,6 +92,18 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 UserBindingStore.bind(platform, senderUserId, uid);
                 return RouteDecision.sync(PendingMessage.ofString("绑定成功，已绑定到玩家ID: " + uid));
             }
+            case "unbind" -> {
+                if (senderUserId == null || senderUserId.isBlank()) {
+                    return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法解绑。请稍后重试。"));
+                }
+                if (args.length != 0) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/unbind"));
+                }
+                boolean removed = UserBindingStore.unbind(platform, senderUserId);
+                return RouteDecision.sync(PendingMessage.ofString(removed
+                        ? "解绑成功。"
+                        : "你当前还没有绑定玩家ID，无需解绑。"));
+            }
             case "bo", "top" -> {
                 if (args.length == 2) {
                     Integer n = parsePositiveInt(args[0]);
@@ -237,6 +249,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 return RouteDecision.sync(PendingMessage.ofString("""
                         可用指令：
                         /bind <玩家ID> - 绑定你的玩家ID
+                        /unbind - 解除你的玩家ID绑定
                         /bo <个数> [玩家ID] - 获取BoN图谱
                         /rs <个数> [玩家ID] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
