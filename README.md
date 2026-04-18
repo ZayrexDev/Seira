@@ -8,16 +8,16 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 ## 演示
 
 ### 最好成绩
-<img width="900" alt="image" src="https://github.com/user-attachments/assets/f4ff6ac7-b241-4c6b-956e-9c258c27faa7" />
+<img width="800" alt="5b3c818dc2ee31c34006912b94a964ec" src="https://github.com/user-attachments/assets/e327de4d-3816-401b-ba0e-366ac743f412" />
 
 ### 铺面信息
-<img width="400" alt="88dee933d3192634cd7fe917b9906857" src="https://github.com/user-attachments/assets/7eea1908-9821-469d-873e-c9ea63f2ef78" />
+<img width="400" alt="92e9c2fbfe193288f1d548a995907224" src="https://github.com/user-attachments/assets/879d6d89-8dbf-4d49-925f-088db7d48eeb" />
 
 ### 排行榜
-<img width="400" alt="1f9303d67a65a32c0d4ed531bd48eaad" src="https://github.com/user-attachments/assets/95d41c25-ce01-4587-a8f9-9450c780d8f8" />
+<img width="400" alt="4152ccfa0c05510f5271368832d150d3" src="https://github.com/user-attachments/assets/faf2e03a-3fc4-4f32-8980-b7f54f1be0ab" />
 
 ### 铺面集信息
-<img width="400" alt="03403d77bf6c381b67d17f89da0d82f8" src="https://github.com/user-attachments/assets/be48925b-1fe4-4b8b-8890-41a34763560c" />
+<img width="400" alt="2fe68add23352fb2dd7822747ad0a8a0" src="https://github.com/user-attachments/assets/50b0395b-a3be-48e6-9c1e-024f7de7e59a" />
 
 ## 快速开始
 
@@ -86,6 +86,7 @@ mvn -U clean compile exec:java
 | `/daily`  | `/daily`                     | 每日挑战信息           |
 | `/mp`     | `/mp`                        | 多人房间列表           |
 | `/bind`   | `/bind <uid>`                | 绑定当前用户到 osu uid  |
+| `/unbind` | `/unbind`                    | 解除当前用户的 uid 绑定   |
 | `/bo`     | `/bo <n> <uid>`              | Best 成绩图片        |
 | `/top`    | `/top <n> <uid>`             | 同 `/bo`          |
 | `/rs`     | `/rs <n> <uid>`              | Recent 成绩图片      |
