@@ -29,7 +29,13 @@ public class APIHelper {
                     .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + uid))
                     .GET()
                     .build();
-            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to best-of-N! Status code: " + send.statusCode());
+            }
+
+            byte[] imageBytes = send.body();
 
             return Base64.getEncoder().encodeToString(imageBytes);
         } catch (IOException | InterruptedException e) {
@@ -44,7 +50,14 @@ public class APIHelper {
                     .uri(URI.create(ENDPOINT + "/pk?" + "m=" + m + "&u=" + uidsParam))
                     .GET()
                     .build();
-            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to get group leaderboard! Status code: " + send.statusCode());
+            }
+
+            byte[] imageBytes = send.body();
 
             return Base64.getEncoder().encodeToString(imageBytes);
         } catch (IOException | InterruptedException e) {
@@ -59,7 +72,13 @@ public class APIHelper {
                     .uri(URI.create(ENDPOINT + "/lb?" + "u=" + uidsParam))
                     .GET()
                     .build();
-            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to get leaderboard! Status code: " + send.statusCode());
+            }
+
+            byte[] imageBytes = send.body();
 
             return Base64.getEncoder().encodeToString(imageBytes);
         } catch (IOException | InterruptedException e) {
@@ -74,7 +93,13 @@ public class APIHelper {
                     .GET()
                     .build();
 
-            final Response r = GSON.fromJson(CLIENT.send(request, HttpResponse.BodyHandlers.ofString()).body(), Response.class);
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to get daily! Status code: " + send.statusCode());
+            }
+
+            final Response r = GSON.fromJson(send.body(), Response.class);
             final JsonObject data = r.getData().getAsJsonObject();
 
             return String.format(
@@ -104,7 +129,13 @@ public class APIHelper {
                     .GET()
                     .build();
 
-            final Response r = GSON.fromJson(CLIENT.send(request, HttpResponse.BodyHandlers.ofString()).body(), Response.class);
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to get multiplayer rooms! Status code: " + send.statusCode());
+            }
+
+            final Response r = GSON.fromJson(send.body(), Response.class);
             final JsonArray data = r.getData().getAsJsonArray();
 
             final StringBuilder sb = new StringBuilder("=== 进行中的多人游戏 ===\n");
@@ -124,7 +155,14 @@ public class APIHelper {
                     .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + uid))
                     .GET()
                     .build();
-            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to get recent! Status code: " + send.statusCode());
+            }
+
+            byte[] imageBytes = send.body();
 
             return Base64.getEncoder().encodeToString(imageBytes);
         } catch (IOException | InterruptedException e) {
@@ -138,7 +176,14 @@ public class APIHelper {
                     .uri(URI.create(ENDPOINT + "/m?" + "&m=" + m + (mod == null || mod.isBlank() ? "" : "&mod=" + mod)))
                     .GET()
                     .build();
-            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to get beatmap! Status code: " + send.statusCode());
+            }
+
+            byte[] imageBytes = send.body();
 
             return Base64.getEncoder().encodeToString(imageBytes);
         } catch (IOException | InterruptedException e) {
@@ -152,7 +197,14 @@ public class APIHelper {
                     .uri(URI.create(ENDPOINT + "/ms?" + "ms=" + m))
                     .GET()
                     .build();
-            byte[] imageBytes = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray()).body();
+
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to get beatmapset! Status code: " + send.statusCode());
+            }
+
+            byte[] imageBytes = send.body();
 
             return Base64.getEncoder().encodeToString(imageBytes);
         } catch (IOException | InterruptedException e) {
