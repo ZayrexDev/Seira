@@ -219,9 +219,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     }
                     return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getLeaderboard(new String[]{String.valueOf(uid)})));
                 } else if (args.length == 1) {
-                    Integer bm = parsePositiveInt(args[0]);
-                    if (bm == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
+                    ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                    if (target.isError()) {
+                        return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
                     if (groupId != null && !groupId.isBlank()) {
                         List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
@@ -231,33 +231,33 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         String[] uidArray = groupBoundUids.stream()
                                 .map(String::valueOf)
                                 .toArray(String[]::new);
-                        return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray)));
+                        return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, uidArray)));
                     }
                     Integer uid = resolveBoundUid(platform, senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
-                    return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, new String[]{String.valueOf(uid)})));
+                    return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, new String[]{String.valueOf(uid)})));
                 } else if (args.length == 2) {
-                    Integer bm = parsePositiveInt(args[0]);
-                    if (bm == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
+                    ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                    if (target.isError()) {
+                        return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
                     String[] uidTokens = args[1].split(",");
                     if (uidTokens.length == 0) {
-                        return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
+                        return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     }
                     String[] uidArray = new String[uidTokens.length];
                     for (int i = 0; i < uidTokens.length; i++) {
                         Integer uid = parsePositiveInt(uidTokens[i].trim());
                         if (uid == null) {
-                            return RouteDecision.sync(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
+                            return RouteDecision.sync(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                         }
                         uidArray[i] = String.valueOf(uid);
                     }
-                    return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(bm, uidArray)));
+                    return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, uidArray)));
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID> [玩家ID列表(逗号分隔)]"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 }
             }
             case "status" -> {
