@@ -3,25 +3,24 @@
 Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 支持生成最好成绩图、最近成绩图、排行榜等，持续更新中...
 
-目前 Seira 依赖 [oStella](https://github.com/ZayrexDev/oStella) 作为上游数据服务。
+Seira 依赖 [oStella](https://github.com/ZayrexDev/oStella) 作为上游数据服务。
 
 ## 演示
 
 ### 最好成绩
-
-<img width="800" alt="5b3c818dc2ee31c34006912b94a964ec" src="https://github.com/user-attachments/assets/e327de4d-3816-401b-ba0e-366ac743f412" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/a10742b8-148d-4fab-90b3-3ecd6882e2ae" />
 
 ### 铺面信息
-
-<img width="400" alt="92e9c2fbfe193288f1d548a995907224" src="https://github.com/user-attachments/assets/879d6d89-8dbf-4d49-925f-088db7d48eeb" />
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/41f36596-94c7-4407-af82-490efccf6704" />
 
 ### 排行榜
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/cbc361a4-61e0-440d-908e-f1d52009373e" />
 
-<img width="400" alt="4152ccfa0c05510f5271368832d150d3" src="https://github.com/user-attachments/assets/faf2e03a-3fc4-4f32-8980-b7f54f1be0ab" />
+### 分数
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/c3ac7fde-adea-427b-be0a-9871a45ca8ad" />
 
 ### 铺面集信息
-
-<img width="400" alt="2fe68add23352fb2dd7822747ad0a8a0" src="https://github.com/user-attachments/assets/50b0395b-a3be-48e6-9c1e-024f7de7e59a" />
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/2bb887d6-5fff-429b-b39e-963235ec463e" />
 
 ## 快速开始
 
