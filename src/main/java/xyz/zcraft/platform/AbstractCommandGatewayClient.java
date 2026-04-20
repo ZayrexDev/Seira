@@ -74,6 +74,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
         String[] parts = body.split("\\s+");
         String command = parts[0].toLowerCase();
+        String query = body.substring(command.length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
         String platform = Seira.getConfig().platform();
 
@@ -182,6 +183,12 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID>"));
                 }
+            }
+            case "sms" -> {
+                if (args.length == 0) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/sms <搜索关键字>"));
+                }
+                return queueApiRequest("sms", () -> PendingMessage.ofString(APIHelper.searchBeatmapSet(query)));
             }
             case "lb", "c" -> {
                 if (args.length == 0) {

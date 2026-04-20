@@ -5,14 +5,18 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import xyz.zcraft.Seira;
+import xyz.zcraft.data.SearchResultItem;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.LinkedList;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -207,6 +211,44 @@ public class APIHelper {
             byte[] imageBytes = send.body();
 
             return Base64.getEncoder().encodeToString(imageBytes);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String searchBeatmapSet(String query) {
+        try {
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)))
+                    .GET()
+                    .build();
+
+            final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to search beatmapset! Status code: " + send.statusCode());
+            }
+
+            final Response response = GSON.fromJson(send.body(), Response.class);
+            final JsonArray data = response.getData().getAsJsonArray();
+
+            final LinkedList<SearchResultItem> items = new LinkedList<>();
+
+            data.forEach(item -> items.add(GSON.fromJson(item, SearchResultItem.class)));
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("\uD83D\uDD0D").append("搜索结果\n")
+                    .append("关键字：").append(query).append("\n");
+
+            for (int i = 0; i < Math.min(items.size(), 10); i++) {
+                SearchResultItem item = items.get(i);
+                sb.append(i + 1).append(". ").append(item.beatmapsetId()).append(" - ").append(item.artist()).append(" - ").append(item.title())
+                        .append(" [").append(item.mapperName()).append("] ")
+                        .append(String.format("(%.2f* - %.2f*)", item.minStar(), item.maxStar()))
+                        .append("\n");
+            }
+
+            return sb.toString().trim();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
