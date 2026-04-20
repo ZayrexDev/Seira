@@ -9,6 +9,7 @@ import xyz.zcraft.binding.UserBindingStore;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.data.PendingMessage;
+import xyz.zcraft.data.ShortcutTarget;
 import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
@@ -156,33 +157,41 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 }
             }
             case "m" -> {
-                if (args.length == 2) {
-                    Integer id = parsePositiveInt(args[0]);
-                    String mod = args[1];
-                    if (id == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
+                if (args.length >= 1) {
+                    ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                    if (target.isError()) {
+                        return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
-                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, mod)));
-                } else if (args.length == 1) {
-                    Integer id = parsePositiveInt(args[0]);
-                    if (id == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
-                    }
-                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, null)));
+
+                    String mod = args.length == 2 ? args[1] : null;
+                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(target, mod)));
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID 或 快捷查询> [Mod]"));
                 }
             }
-            case "ms" -> {
-                if (args.length == 1) {
-                    Integer id = parsePositiveInt(args[0]);
-                    if (id == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID>"));
-                    }
-                    return queueApiRequest("ms", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(id)));
-                } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID>"));
+            case "s" -> {
+                if (args.length != 1) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/s <成绩ID 或 快捷查询>"));
                 }
+
+                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                }
+
+                return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+            }
+            case "ms" -> {
+                if (args.length != 1) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
+                }
+
+                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                }
+
+                return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(target)));
             }
             case "sms" -> {
                 if (args.length == 0) {
@@ -275,6 +284,26 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             }
         }
 
+    }
+
+    private ShortcutTarget parseTarget(String arg, String platform, String senderUserId) {
+        if (arg.toLowerCase().startsWith("@rs") || arg.toLowerCase().startsWith("@bo")) {
+            String index = arg.substring(1);
+
+            Integer uid = resolveBoundUid(platform, senderUserId);
+            if (uid == null) {
+                return new ShortcutTarget(null, null, null, "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>");
+            }
+
+            return new ShortcutTarget(null, uid, index, null);
+        }
+
+        Integer id = parsePositiveInt(arg);
+        if (id == null) {
+            return new ShortcutTarget(null, null, null, "ID必须是数字或有效的快捷指令 (例如 @rs1)。");
+        }
+
+        return new ShortcutTarget(id, null, null, null);
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {

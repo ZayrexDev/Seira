@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import xyz.zcraft.Seira;
 import xyz.zcraft.data.SearchResultItem;
+import xyz.zcraft.data.ShortcutTarget;
 
 import java.io.IOException;
 import java.net.URI;
@@ -174,10 +175,17 @@ public class APIHelper {
         }
     }
 
-    public static String getBeatmap(int m, String mod) {
+    public static String getBeatmap(ShortcutTarget target, String mod) {
         try {
+            String query;
+            if (target.isMacro()) {
+                query = "/m?of=" + target.macroIndex() + "&u=" + target.boundUid();
+            } else {
+                query = "/m?m=" + target.explicitId() + (mod == null || mod.isBlank() ? "" : "&mod=" + mod);
+            }
+
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/m?" + "&m=" + m + (mod == null || mod.isBlank() ? "" : "&mod=" + mod)))
+                    .uri(URI.create(ENDPOINT + query))
                     .GET()
                     .build();
 
@@ -195,10 +203,17 @@ public class APIHelper {
         }
     }
 
-    public static String getBeatmapSet(int m) {
+    public static String getBeatmapSet(ShortcutTarget target) {
         try {
+            String query;
+            if (target.isMacro()) {
+                query = "/ms?of=" + target.macroIndex() + "&u=" + target.boundUid();
+            } else {
+                query = "/ms?ms=" + target.explicitId();
+            }
+
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/ms?" + "ms=" + m))
+                    .uri(URI.create(ENDPOINT + query))
                     .GET()
                     .build();
 
@@ -206,6 +221,34 @@ public class APIHelper {
 
             if (send.statusCode() != 200) {
                 throw new RuntimeException("Failed to get beatmapset! Status code: " + send.statusCode());
+            }
+
+            byte[] imageBytes = send.body();
+
+            return Base64.getEncoder().encodeToString(imageBytes);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String getScore(ShortcutTarget target) {
+        try {
+            String query;
+            if (target.isMacro()) {
+                query = "/s?of=" + target.macroIndex() + "&u=" + target.boundUid();
+            } else {
+                query = "/s?s=" + target.explicitId();
+            }
+
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + query))
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to get score! Status code: " + send.statusCode());
             }
 
             byte[] imageBytes = send.body();
