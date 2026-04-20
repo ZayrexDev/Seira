@@ -126,7 +126,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
                     return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getBoN(n, uid)));
-                } else {
+                } else if(args.length == 0) {
+                    ShortcutTarget target = parseTarget("bo1", platform, senderUserId);
+                    if (target.isError()) {
+                        return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                    }
+
+                    return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+                }  else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID]"));
                 }
             }
@@ -154,6 +161,13 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
                     return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getRecent(n, uid)));
+                } else if(args.length == 0) {
+                    ShortcutTarget target = parseTarget("rs1", platform, senderUserId);
+                    if (target.isError()) {
+                        return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                    }
+
+                    return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID]"));
                 }
