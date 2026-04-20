@@ -8,15 +8,19 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 ## 演示
 
 ### 最好成绩
+
 <img width="800" alt="5b3c818dc2ee31c34006912b94a964ec" src="https://github.com/user-attachments/assets/e327de4d-3816-401b-ba0e-366ac743f412" />
 
 ### 铺面信息
+
 <img width="400" alt="92e9c2fbfe193288f1d548a995907224" src="https://github.com/user-attachments/assets/879d6d89-8dbf-4d49-925f-088db7d48eeb" />
 
 ### 排行榜
+
 <img width="400" alt="4152ccfa0c05510f5271368832d150d3" src="https://github.com/user-attachments/assets/faf2e03a-3fc4-4f32-8980-b7f54f1be0ab" />
 
 ### 铺面集信息
+
 <img width="400" alt="2fe68add23352fb2dd7822747ad0a8a0" src="https://github.com/user-attachments/assets/50b0395b-a3be-48e6-9c1e-024f7de7e59a" />
 
 ## 快速开始
@@ -80,27 +84,28 @@ mvn -U clean compile exec:java
 
 > 所有命令都以 `/` 开头。
 
-| 命令        | 用法                            | 结果              |
-|-----------|-------------------------------|-----------------|
-| `/bind`   | `/bind <uid>`                 | 绑定当前用户到 osu uid |
-| `/unbind` | `/unbind`                     | 解除当前用户的 uid 绑定  |
-| `/bo`     | `/bo <n> [uid]`               | 最好n个成绩图         |
-| `/rs`     | `/rs <n> [uid]`               | 最近n个成绩图         |
-| `/m`      | `/m <id/rsN/boN> [Mod]`       | 获取指定铺面信息        |
-| `/s`      | `/s <id/rsN/boN>`             | 获取指定成绩图         |
-| `/ms`     | `/ms <id/rsN/boN>`            | 获取指定铺面集信息       |
-| `/sms`    | `/sms <query>`                | 搜索铺面集           |
-| `/lb`     | `/lb [id] [<uid1>,<uid2>...]` | 列出指定铺面排行或表现分排行  |
-| `/daily`  | `/daily`                      | 每日挑战信息          |
-| `/mp`     | `/mp`                         | 多人房间列表          |
-| `/status` | `/status`                     | 服务状态文本          |
-| `/help`   | `/help`                       | 显示帮助信息          |
+| 命令        | 用法                            | 结果                    |
+|-----------|-------------------------------|-----------------------|
+| `/bind`   | `/bind <uid>`                 | 绑定当前用户到 osu uid       |
+| `/unbind` | `/unbind`                     | 解除当前用户的 uid 绑定        |
+| `/bo`     | `/bo [n] [uid]`               | 最好n个成绩图，无参时获取最佳成绩详情   |
+| `/rs`     | `/rs [n] [uid]`               | 最近n个成绩图，无参时获取最近一个成绩详情 |
+| `/m`      | `/m <id/rsN/boN> [Mod]`       | 获取指定铺面信息              |
+| `/s`      | `/s <id/rsN/boN>`             | 获取指定成绩图               |
+| `/ms`     | `/ms <id/rsN/boN>`            | 获取指定铺面集信息             |
+| `/sms`    | `/sms <query>`                | 搜索铺面集                 |
+| `/lb`     | `/lb [id] [<uid1>,<uid2>...]` | 列出指定铺面排行或表现分排行        |
+| `/daily`  | `/daily`                      | 每日挑战信息                |
+| `/mp`     | `/mp`                         | 多人房间列表                |
+| `/status` | `/status`                     | 服务状态文本                |
+| `/help`   | `/help`                       | 显示帮助信息                |
 
 绑定后可省略 uid：`/bo <n>`、`/rs <n>`。
 在群聊中，`/c <bm>` 会默认使用该群里已绑定过的所有玩家 uid；私聊中 `/c <bm>` 使用你自己的绑定 uid。
 另外：`/c` 或 `/lb` 不带参数时，会基于默认绑定 uid 生成总表现分排行榜（群聊=本群绑定用户，私聊=你自己的绑定 uid）。
 
-其中会调用 `APIHelper` 的指令（如 `/bo`、`/rs`、`/m`、`/s`、`/ms`、`/sms`、`/c`、`/lb`、`/daily`、`/mp`）会先回复“请求已加入队列，预计等待时间 X 秒”，待异步请求完成后再额外发送结果消息。
+其中会调用 `APIHelper` 的指令（如 `/bo`、`/rs`、`/m`、`/s`、`/ms`、`/sms`、`/c`、`/lb`、`/daily`、`/mp`）会先回复“请求已加入队列，预计等待时间
+X 秒”，待异步请求完成后再额外发送结果消息。
 
 ### 快捷查询
 
