@@ -48,11 +48,18 @@ public class APIHelper {
         }
     }
 
-    public static String getGroupLeaderboard(int m, String[] uids) {
+    public static String getGroupLeaderboard(ShortcutTarget target, String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
+            String query;
+            if (target.isMacro()) {
+                query = "/pk?of=" + target.getOfString() + "&us=" + target.boundUid() + "&u=" + uidsParam;
+            } else {
+                query = "/pk?m=" + target.explicitId() + "&u=" + uidsParam;
+            }
+
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/pk?" + "m=" + m + "&u=" + uidsParam))
+                    .uri(URI.create(ENDPOINT + query))
                     .GET()
                     .build();
 
