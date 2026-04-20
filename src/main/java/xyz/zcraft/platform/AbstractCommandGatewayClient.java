@@ -9,18 +9,21 @@ import xyz.zcraft.binding.UserBindingStore;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.data.PendingMessage;
+import xyz.zcraft.data.ShortcutTarget;
 import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public abstract class AbstractCommandGatewayClient extends WebSocketClient implements PlatformGatewayClient {
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
     private static final String PREFIX = "/";
     private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
-
+    private static final Pattern MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
     private final PlatformMessageSender messageSender;
 
     protected AbstractCommandGatewayClient(URI serverUri, PlatformMessageSender messageSender) {
@@ -74,6 +77,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
         String[] parts = body.split("\\s+");
         String command = parts[0].toLowerCase();
+        String query = body.substring(command.length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
         String platform = Seira.getConfig().platform();
 
@@ -155,33 +159,47 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 }
             }
             case "m" -> {
-                if (args.length == 2) {
-                    Integer id = parsePositiveInt(args[0]);
-                    String mod = args[1];
-                    if (id == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
+                if (args.length >= 1) {
+                    ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                    if (target.isError()) {
+                        return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
-                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, mod)));
-                } else if (args.length == 1) {
-                    Integer id = parsePositiveInt(args[0]);
-                    if (id == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
-                    }
-                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(id, null)));
+
+                    String mod = args.length == 2 ? args[1] : null;
+                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(target, mod)));
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID> [Mod]"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID 或 快捷查询> [Mod]"));
                 }
             }
-            case "ms" -> {
-                if (args.length == 1) {
-                    Integer id = parsePositiveInt(args[0]);
-                    if (id == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID>"));
-                    }
-                    return queueApiRequest("ms", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(id)));
-                } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID>"));
+            case "s" -> {
+                if (args.length != 1) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/s <成绩ID 或 快捷查询>"));
                 }
+
+                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                }
+
+                return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+            }
+            case "ms" -> {
+                if (args.length != 1) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
+                }
+
+                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                }
+
+                return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(target)));
+            }
+            case "sms" -> {
+                if (args.length == 0) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/sms <搜索关键字>"));
+                }
+                return queueApiRequest("sms", () -> PendingMessage.ofString(APIHelper.searchBeatmapSet(query)));
             }
             case "lb", "c" -> {
                 if (args.length == 0) {
@@ -254,6 +272,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         /rs <个数> [玩家ID] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
                         /ms <铺面集ID> - 获取铺面集图谱
+                        /sms <关键字> - 搜索铺面集
                         /c <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
                         /lb [铺面ID] - /c 的别名（省略参数时走绑定用户）
                         /daily - 获取每日挑战
@@ -267,6 +286,33 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             }
         }
 
+    }
+
+    private ShortcutTarget parseTarget(String arg, String platform, String senderUserId) {
+        Matcher matcher = MACRO_PATTERN.matcher(arg.trim());
+
+        if (matcher.matches()) {
+            String type = matcher.group(1).toLowerCase();
+            Long index = parsePositiveLong(matcher.group(2));
+
+            if (index == null || index < 1 || index > 100) {
+                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+            }
+
+            Integer uid = resolveBoundUid(platform, senderUserId);
+            if (uid == null) {
+                return new ShortcutTarget(null, null, null, null, "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>");
+            }
+
+            return new ShortcutTarget(null, uid, type, index, null);
+        }
+
+        Long id = parsePositiveLong(arg);
+        if (id == null) {
+            return new ShortcutTarget(null, null, null, null, "参数无效。请输入纯数字ID或快捷指令 (例如 rs1, bo3)。");
+        }
+
+        return new ShortcutTarget(id, null, null, null, null);
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
@@ -327,6 +373,31 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         }
     }
 
+    private Integer resolveBoundUid(String platform, String senderUserId) {
+        if (senderUserId == null || senderUserId.isBlank()) {
+            return null;
+        }
+        return UserBindingStore.findBoundUid(platform, senderUserId);
+    }
+
+    private Integer parsePositiveInt(String value) {
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Long parsePositiveLong(String value) {
+        try {
+            long parsed = Long.parseLong(value);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     @FunctionalInterface
     private interface ApiTaskExecutor {
         PendingMessage execute();
@@ -342,22 +413,6 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
         private static RouteDecision async(PendingMessage message, ApiTask apiTask) {
             return new RouteDecision(message, apiTask);
-        }
-    }
-
-    private Integer resolveBoundUid(String platform, String senderUserId) {
-        if (senderUserId == null || senderUserId.isBlank()) {
-            return null;
-        }
-        return UserBindingStore.findBoundUid(platform, senderUserId);
-    }
-
-    private Integer parsePositiveInt(String value) {
-        try {
-            int parsed = Integer.parseInt(value);
-            return parsed > 0 ? parsed : null;
-        } catch (NumberFormatException ignored) {
-            return null;
         }
     }
 }
