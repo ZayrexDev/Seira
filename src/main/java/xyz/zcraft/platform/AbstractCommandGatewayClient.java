@@ -16,12 +16,14 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public abstract class AbstractCommandGatewayClient extends WebSocketClient implements PlatformGatewayClient {
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
     private static final String PREFIX = "/";
     private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
-
+    private static final Pattern MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
     private final PlatformMessageSender messageSender;
 
     protected AbstractCommandGatewayClient(URI serverUri, PlatformMessageSender messageSender) {
@@ -287,23 +289,30 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private ShortcutTarget parseTarget(String arg, String platform, String senderUserId) {
-        if (arg.toLowerCase().startsWith("@rs") || arg.toLowerCase().startsWith("@bo")) {
-            String index = arg.substring(1);
+        Matcher matcher = MACRO_PATTERN.matcher(arg.trim());
+
+        if (matcher.matches()) {
+            String type = matcher.group(1).toLowerCase();
+            Long index = parsePositiveLong(matcher.group(2));
+
+            if (index == null || index < 1 || index > 100) {
+                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+            }
 
             Integer uid = resolveBoundUid(platform, senderUserId);
             if (uid == null) {
-                return new ShortcutTarget(null, null, null, "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>");
+                return new ShortcutTarget(null, null, null, null, "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>");
             }
 
-            return new ShortcutTarget(null, uid, index, null);
+            return new ShortcutTarget(null, uid, type, index, null);
         }
 
-        Integer id = parsePositiveInt(arg);
+        Long id = parsePositiveLong(arg);
         if (id == null) {
-            return new ShortcutTarget(null, null, null, "ID必须是数字或有效的快捷指令 (例如 @rs1)。");
+            return new ShortcutTarget(null, null, null, null, "参数无效。请输入纯数字ID或快捷指令 (例如 rs1, bo3)。");
         }
 
-        return new ShortcutTarget(id, null, null, null);
+        return new ShortcutTarget(id, null, null, null, null);
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
@@ -364,6 +373,31 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         }
     }
 
+    private Integer resolveBoundUid(String platform, String senderUserId) {
+        if (senderUserId == null || senderUserId.isBlank()) {
+            return null;
+        }
+        return UserBindingStore.findBoundUid(platform, senderUserId);
+    }
+
+    private Integer parsePositiveInt(String value) {
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Long parsePositiveLong(String value) {
+        try {
+            long parsed = Long.parseLong(value);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     @FunctionalInterface
     private interface ApiTaskExecutor {
         PendingMessage execute();
@@ -379,22 +413,6 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
         private static RouteDecision async(PendingMessage message, ApiTask apiTask) {
             return new RouteDecision(message, apiTask);
-        }
-    }
-
-    private Integer resolveBoundUid(String platform, String senderUserId) {
-        if (senderUserId == null || senderUserId.isBlank()) {
-            return null;
-        }
-        return UserBindingStore.findBoundUid(platform, senderUserId);
-    }
-
-    private Integer parsePositiveInt(String value) {
-        try {
-            int parsed = Integer.parseInt(value);
-            return parsed > 0 ? parsed : null;
-        } catch (NumberFormatException ignored) {
-            return null;
         }
     }
 }

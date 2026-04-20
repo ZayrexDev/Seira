@@ -179,7 +179,7 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/m?of=" + target.macroIndex() + "&u=" + target.boundUid();
+                query = "/m?of=" + target.getOfString() + "&u=" + target.boundUid();
             } else {
                 query = "/m?m=" + target.explicitId() + (mod == null || mod.isBlank() ? "" : "&mod=" + mod);
             }
@@ -207,7 +207,7 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/ms?of=" + target.macroIndex() + "&u=" + target.boundUid();
+                query = "/ms?of=" + target.getOfString() + "&u=" + target.boundUid();
             } else {
                 query = "/ms?ms=" + target.explicitId();
             }
@@ -235,7 +235,7 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/s?of=" + target.macroIndex() + "&u=" + target.boundUid();
+                query = "/s?of=" + target.getOfString() + "&u=" + target.boundUid();
             } else {
                 query = "/s?s=" + target.explicitId();
             }
