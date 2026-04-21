@@ -361,9 +361,6 @@ public class APIHelper {
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new RuntimeException("Failed to queue replay render! Status code: " + response.statusCode());
-            }
 
             Response payload = GSON.fromJson(response.body(), Response.class);
             ensureApiSuccess(payload, "回放渲染请求失败");
@@ -407,9 +404,6 @@ public class APIHelper {
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new RuntimeException("Failed to query replay status! Status code: " + response.statusCode());
-            }
 
             Response payload = GSON.fromJson(response.body(), Response.class);
             ensureApiSuccess(payload, "查询回放渲染状态失败");
