@@ -23,7 +23,7 @@ public class APIHelper {
     private static final String ENDPOINT;
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
-    private static final int REPLAY_POLL_INTERVAL_MS = 2000;
+    private static final int REPLAY_POLL_INTERVAL_MS = 5000;
     private static final int REPLAY_MAX_POLL_ATTEMPTS = 45;
 
     static {
