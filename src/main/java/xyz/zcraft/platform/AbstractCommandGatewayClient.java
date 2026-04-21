@@ -23,7 +23,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
     private static final String PREFIX = "/";
     private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
-    private static final Pattern MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
+    private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$"); // bo25, rs1
+    private static final Pattern SET_MACRO_PATTERN = Pattern.compile("(?i)^ms(\\d+)#(\\d+)$"); // ms12345#1
     private final PlatformMessageSender messageSender;
 
     protected AbstractCommandGatewayClient(URI serverUri, PlatformMessageSender messageSender) {
@@ -303,11 +304,22 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private ShortcutTarget parseTarget(String arg, String platform, String senderUserId) {
-        Matcher matcher = MACRO_PATTERN.matcher(arg.trim());
+        Matcher setMatcher = SET_MACRO_PATTERN.matcher(arg.trim());
+        if (setMatcher.matches()) {
+            Long setId = parsePositiveLong(setMatcher.group(1));
+            Long index = parsePositiveLong(setMatcher.group(2));
 
-        if (matcher.matches()) {
-            String type = matcher.group(1).toLowerCase();
-            Long index = parsePositiveLong(matcher.group(2));
+            if (setId == null || index == null || index < 1) {
+                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效。例如: ms12345#2");
+            }
+
+            return new ShortcutTarget(setId, null, "ms", index, null);
+        }
+
+        Matcher userMatcher = USER_MACRO_PATTERN.matcher(arg.trim());
+        if (userMatcher.matches()) {
+            String type = userMatcher.group(1).toLowerCase();
+            Long index = parsePositiveLong(userMatcher.group(2));
 
             if (index == null || index < 1 || index > 100) {
                 return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
@@ -323,7 +335,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
         Long id = parsePositiveLong(arg);
         if (id == null) {
-            return new ShortcutTarget(null, null, null, null, "参数无效。请输入纯数字ID或快捷指令 (例如 rs1, bo3)。");
+            return new ShortcutTarget(null, null, null, null, "参数无效。请输入纯数字ID或快捷指令 (例如 rs1, ms12345#2)。");
         }
 
         return new ShortcutTarget(id, null, null, null, null);

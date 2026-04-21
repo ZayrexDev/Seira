@@ -53,7 +53,7 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/pk?of=" + target.getOfString() + "&us=" + target.boundUid() + "&u=" + uidsParam;
+                query = "/pk?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
             } else {
                 query = "/pk?m=" + target.explicitId() + "&u=" + uidsParam;
             }
@@ -184,12 +184,7 @@ public class APIHelper {
 
     public static String getBeatmap(ShortcutTarget target, String mod) {
         try {
-            String query;
-            if (target.isMacro()) {
-                query = "/m?of=" + target.getOfString() + "&u=" + target.boundUid();
-            } else {
-                query = "/m?m=" + target.explicitId() + (mod == null || mod.isBlank() ? "" : "&mod=" + mod);
-            }
+            final String query = getBeatmapQuery(target, mod);
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
@@ -210,11 +205,31 @@ public class APIHelper {
         }
     }
 
+    private static String getBeatmapQuery(ShortcutTarget target, String mod) {
+        String query = "/m?";
+        if (target.isMacro()) {
+            query += "&i=" + target.macroIndex();
+            if (target.boundUid() != null) {
+                query += "&of=" + target.macroType() + "&u=" + target.boundUid();
+            } else if (target.macroType().equals("ms")) {
+                query += "&ms=" + target.explicitId();
+            }
+        } else {
+            query = "/m?m=" + target.explicitId();
+        }
+
+        if (mod != null) {
+            query += "&mod=" + mod;
+        }
+
+        return query;
+    }
+
     public static String getBeatmapSet(ShortcutTarget target) {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/ms?of=" + target.getOfString() + "&u=" + target.boundUid();
+                query = "/ms?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
             } else {
                 query = "/ms?ms=" + target.explicitId();
             }
@@ -242,7 +257,7 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/s?of=" + target.getOfString() + "&u=" + target.boundUid();
+                query = "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
             } else {
                 query = "/s?s=" + target.explicitId();
             }
