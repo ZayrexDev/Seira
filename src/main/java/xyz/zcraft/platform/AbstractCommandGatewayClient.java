@@ -24,7 +24,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private static final String PREFIX = "/";
     private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
     private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$"); // bo25, rs1
-    private static final Pattern SET_MACRO_PATTERN = Pattern.compile("(?i)^ms(\\d+)#(\\d+)$"); // ms12345#1
+    private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$"); // 12345#1
     private final PlatformMessageSender messageSender;
 
     protected AbstractCommandGatewayClient(URI serverUri, PlatformMessageSender messageSender) {
@@ -310,7 +310,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             Long index = parsePositiveLong(setMatcher.group(2));
 
             if (setId == null || index == null || index < 1) {
-                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效。例如: ms12345#2");
+                return new ShortcutTarget(null, null, null, null, "铺面集索引无效。例如: 12345#2");
             }
 
             return new ShortcutTarget(setId, null, "ms", index, null);
@@ -335,7 +335,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
         Long id = parsePositiveLong(arg);
         if (id == null) {
-            return new ShortcutTarget(null, null, null, null, "参数无效。请输入纯数字ID或快捷指令 (例如 rs1, ms12345#2)。");
+            return new ShortcutTarget(null, null, null, null, "参数无效。请输入纯数字ID或快捷指令 (例如 rs1, 12345#2)。");
         }
 
         return new ShortcutTarget(id, null, null, null, null);
