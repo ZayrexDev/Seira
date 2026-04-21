@@ -23,6 +23,8 @@ public class APIHelper {
     private static final String ENDPOINT;
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
+    private static final int REPLAY_POLL_INTERVAL_MS = 2000;
+    private static final int REPLAY_MAX_POLL_ATTEMPTS = 45;
 
     static {
         ENDPOINT = Seira.getConfig().endpoint();
@@ -317,5 +319,139 @@ public class APIHelper {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static ReplayRenderResult prepareReplayVideo(ShortcutTarget target) {
+        String taskId = createReplayTask(target);
+        try {
+            waitReplayDone(taskId);
+            return new ReplayRenderResult(ENDPOINT + "/replay/video/" + taskId, taskId);
+        } catch (RuntimeException ex) {
+            try {
+                cleanupReplayVideo(taskId);
+            } catch (RuntimeException ignored) {
+            }
+            throw ex;
+        }
+    }
+
+    public static void cleanupReplayVideo(String taskId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/replay/video/" + taskId))
+                    .DELETE()
+                    .build();
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Failed to cleanup replay video! Status code: " + response.statusCode());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Replay cleanup interrupted", e);
+        }
+    }
+
+    private static String createReplayTask(ShortcutTarget target) {
+        try {
+            String query = getReplayRenderQuery(target);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + query))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Failed to queue replay render! Status code: " + response.statusCode());
+            }
+
+            Response payload = GSON.fromJson(response.body(), Response.class);
+            ensureApiSuccess(payload, "回放渲染请求失败");
+            JsonObject data = requireDataObject(payload, "回放渲染请求缺少任务信息");
+            if (!data.has("id") || data.get("id").isJsonNull()) {
+                throw new RuntimeException("回放渲染请求缺少任务ID");
+            }
+            return data.get("id").getAsString();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Replay render request interrupted", e);
+        }
+    }
+
+    private static void waitReplayDone(String taskId) {
+        for (int attempt = 1; attempt <= REPLAY_MAX_POLL_ATTEMPTS; attempt++) {
+            String status = getReplayStatus(taskId);
+            if ("done".equalsIgnoreCase(status)) {
+                return;
+            }
+            if ("failed".equalsIgnoreCase(status) || "canceled".equalsIgnoreCase(status)) {
+                throw new RuntimeException("回放渲染失败，状态：" + status);
+            }
+            try {
+                Thread.sleep(REPLAY_POLL_INTERVAL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Replay status polling interrupted", e);
+            }
+        }
+
+        throw new RuntimeException("回放渲染超时，请稍后重试。");
+    }
+
+    private static String getReplayStatus(String taskId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/replay/status/" + taskId))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Failed to query replay status! Status code: " + response.statusCode());
+            }
+
+            Response payload = GSON.fromJson(response.body(), Response.class);
+            ensureApiSuccess(payload, "查询回放渲染状态失败");
+            JsonObject data = requireDataObject(payload, "回放渲染状态响应缺少data");
+            if (!data.has("status") || data.get("status").isJsonNull()) {
+                throw new RuntimeException("回放渲染状态响应缺少status");
+            }
+            return data.get("status").getAsString();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Replay status request interrupted", e);
+        }
+    }
+
+    private static String getReplayRenderQuery(ShortcutTarget target) {
+        if (target.isMacro()) {
+            if (target.boundUid() == null) {
+                throw new RuntimeException("回放仅支持玩家快捷查询（如 rs1/bo1）或成绩ID。");
+            }
+            return "/replay/render?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+        }
+        return "/replay/render?s=" + target.explicitId();
+    }
+
+    private static void ensureApiSuccess(Response payload, String fallbackMessage) {
+        if (payload == null) {
+            throw new RuntimeException(fallbackMessage);
+        }
+        if (!payload.isSuccess()) {
+            throw new RuntimeException(payload.getMessage() != null ? payload.getMessage() : fallbackMessage);
+        }
+    }
+
+    private static JsonObject requireDataObject(Response payload, String message) {
+        if (payload.getData() == null || !payload.getData().isJsonObject()) {
+            throw new RuntimeException(message);
+        }
+        return payload.getData().getAsJsonObject();
+    }
+
+    public record ReplayRenderResult(String videoUrl, String taskId) {
     }
 }

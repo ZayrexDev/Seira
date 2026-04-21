@@ -16,6 +16,7 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -198,6 +199,32 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
                 return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
             }
+            case "r" -> {
+                if (args.length != 1) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/r <成绩ID 或 快捷查询>"));
+                }
+
+                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                }
+
+                AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
+                return queueApiRequest(
+                        "r",
+                        () -> {
+                            APIHelper.ReplayRenderResult result = APIHelper.prepareReplayVideo(target);
+                            replayResultRef.set(result);
+                            return PendingMessage.ofVideoUrl(result.videoUrl());
+                        },
+                        () -> {
+                            APIHelper.ReplayRenderResult result = replayResultRef.get();
+                            if (result != null) {
+                                APIHelper.cleanupReplayVideo(result.taskId());
+                            }
+                        }
+                );
+            }
             case "ms" -> {
                 if (args.length != 1) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
@@ -287,6 +314,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         /rs <个数> [玩家ID] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
                         /ms <铺面集ID> - 获取铺面集图谱
+                        /r <成绩ID或快捷查询> - 生成成绩回放视频
                         /sms <关键字> - 搜索铺面集
                         /c <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
                         /lb [铺面ID] - /c 的别名（省略参数时走绑定用户）
@@ -342,9 +370,13 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
+        return queueApiRequest(requestType, executor, () -> {});
+    }
+
+    private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
         long estimatedSeconds = API_REQUEST_STATS.estimateAndEnqueue(requestType);
         PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor));
+        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor));
     }
 
     private void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
@@ -358,6 +390,11 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("请求处理失败，请稍后再试。"), messageSeqCounter);
             LOG.error("Failed to execute API task for message {}", messageId, e);
         } finally {
+            try {
+                apiTask.postProcessor().execute();
+            } catch (Exception e) {
+                LOG.warn("Failed to run post-processor for message {}", messageId, e);
+            }
             long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
             API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
         }
@@ -429,7 +466,12 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         PendingMessage execute();
     }
 
-    private record ApiTask(String requestType, ApiTaskExecutor executor) {
+    @FunctionalInterface
+    private interface ApiTaskPostProcessor {
+        void execute();
+    }
+
+    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
     }
 
     protected record RouteDecision(PendingMessage initialMessage, ApiTask apiTask) {

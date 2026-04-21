@@ -6,6 +6,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
+import xyz.zcraft.data.PendingMessage;
 import xyz.zcraft.platform.PlatformPrivateMessageApi;
 
 import java.io.IOException;
@@ -47,29 +48,37 @@ public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
 
     @Override
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url) {
-        FileInfo fileInfo = new FileInfo();
-        fileInfo.setString("[CQ:image,file=" + url + "]");
-        return fileInfo;
+        return buildCqMedia(fileType, url, false);
     }
 
     @Override
     public FileInfo uploadPrivateMediaBase64(String userId, int fileType, String base64Str) {
-        FileInfo fileInfo = new FileInfo();
-        fileInfo.setString("[CQ:image,file=base64://" + base64Str + "]");
-        return fileInfo;
+        return buildCqMedia(fileType, base64Str, true);
     }
 
     @Override
     public FileInfo uploadGroupMedia(String groupId, int fileType, String url) {
-        FileInfo fileInfo = new FileInfo();
-        fileInfo.setString("[CQ:image,file=" + url + "]");
-        return fileInfo;
+        return buildCqMedia(fileType, url, false);
     }
 
     @Override
     public FileInfo uploadGroupMediaBase64(String groupId, int fileType, String base64Str) {
+        return buildCqMedia(fileType, base64Str, true);
+    }
+
+    private FileInfo buildCqMedia(int fileType, String source, boolean base64) {
+        String cqType = switch (fileType) {
+            case PendingMessage.FILE_TYPE_VIDEO -> "video";
+            case PendingMessage.FILE_TYPE_IMAGE -> "image";
+            default -> {
+                LOG.warn("Unsupported fileType {} for napcat media, fallback to image", fileType);
+                yield "image";
+            }
+        };
+        String fileValue = base64 ? "base64://" + source : source;
+
         FileInfo fileInfo = new FileInfo();
-        fileInfo.setString("[CQ:image,file=base64://" + base64Str + "]");
+        fileInfo.setString("[CQ:" + cqType + ",file=" + fileValue + "]");
         return fileInfo;
     }
 
