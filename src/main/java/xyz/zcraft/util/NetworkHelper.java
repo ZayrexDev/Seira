@@ -68,8 +68,9 @@ public class NetworkHelper {
                     .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(message)))
                     .build();
 
-            if (CLIENT.send(request, HttpResponse.BodyHandlers.ofString()).statusCode() != 200) {
-                throw new RuntimeException("Failed to send private message to " + openId);
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to send private message to " + openId + " " + send.body());
             }
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
