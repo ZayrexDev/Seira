@@ -228,11 +228,25 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
+                APIHelper.ReplayTaskInfo taskInfo;
+                try {
+                    taskInfo = APIHelper.createReplayRenderTask(target);
+                } catch (Exception e) {
+                    return RouteDecision.sync(PendingMessage.ofString(resolveErrorMessage(e)));
+                }
+
+                String queuedText = "生成请求正在等待中";
+                if (taskInfo.position() != null) {
+                    queuedText += "，队列位置：" + taskInfo.position();
+                }
+                queuedText += "。";
+
                 AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
                 return queueApiRequest(
                         "r",
+                        PendingMessage.ofString(queuedText),
                         () -> {
-                            APIHelper.ReplayRenderResult result = APIHelper.prepareReplayVideo(target);
+                            APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
                             replayResultRef.set(result);
                             return PendingMessage.ofVideoUrl(result.videoUrl());
                         },
@@ -447,6 +461,11 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
         return queueApiRequest(requestType, executor, () -> {});
+    }
+
+    private RouteDecision queueApiRequest(String requestType, PendingMessage queuedNotice, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
+        API_REQUEST_STATS.estimateAndEnqueue(requestType);
+        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor));
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {

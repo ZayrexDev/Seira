@@ -325,7 +325,25 @@ public class APIHelper {
     }
 
     public static ReplayRenderResult prepareReplayVideo(ShortcutTarget target) {
-        String taskId = createReplayTask(target);
+        ReplayTaskInfo taskInfo = createReplayTask(target);
+        String taskId = taskInfo.taskId();
+        try {
+            waitReplayDone(taskId);
+            return new ReplayRenderResult(ENDPOINT + "/replay/video/" + taskId, taskId);
+        } catch (RuntimeException ex) {
+            try {
+                cleanupReplayVideo(taskId);
+            } catch (RuntimeException ignored) {
+            }
+            throw ex;
+        }
+    }
+
+    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target) {
+        return createReplayTask(target);
+    }
+
+    public static ReplayRenderResult waitReplayVideo(String taskId) {
         try {
             waitReplayDone(taskId);
             return new ReplayRenderResult(ENDPOINT + "/replay/video/" + taskId, taskId);
@@ -356,7 +374,7 @@ public class APIHelper {
         }
     }
 
-    private static String createReplayTask(ShortcutTarget target) {
+    private static ReplayTaskInfo createReplayTask(ShortcutTarget target) {
         try {
             String query = getReplayRenderQuery(target);
             HttpRequest request = HttpRequest.newBuilder()
@@ -375,7 +393,14 @@ public class APIHelper {
             if (!data.has("id") || data.get("id").isJsonNull()) {
                 throw new RuntimeException("回放渲染请求缺少任务ID");
             }
-            return data.get("id").getAsString();
+            String taskId = data.get("id").getAsString();
+            String status = data.has("status") && !data.get("status").isJsonNull()
+                    ? data.get("status").getAsString()
+                    : null;
+            Integer position = data.has("position") && !data.get("position").isJsonNull()
+                    ? data.get("position").getAsInt()
+                    : null;
+            return new ReplayTaskInfo(taskId, status, position);
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
@@ -512,5 +537,8 @@ public class APIHelper {
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId) {
+    }
+
+    public record ReplayTaskInfo(String taskId, String status, Integer position) {
     }
 }
