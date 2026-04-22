@@ -12,7 +12,9 @@ import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -22,7 +24,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
     private static final String PREFIX = "/";
     private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
-    private static final String RSC_USAGE = "用法：/rsc <成绩ID列表(逗号分隔) 或 快捷查询>";
+    private static final String RSC_USAGE = "用法：/rsc <铺面ID或快捷查询> [+用户ID列表，逗号分隔]";
     private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
     private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$"); // bo25, rs1
     private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$"); // 12345#1
@@ -245,41 +247,34 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 return queueReplayTask("r", () -> APIHelper.createReplayRenderTask(target));
             }
             case "rsc" -> {
-                if (args.length != 1) {
-                    return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
-                }
-
-                String arg = args[0] == null ? "" : args[0].trim();
-                String scoreIdsCsv = parseScoreIdCsv(arg);
-                if (scoreIdsCsv != null) {
-                    return queueReplayTask("rsc", () -> APIHelper.createReplayShowcaseTaskByScores(scoreIdsCsv));
-                }
-
-                if (arg.contains(",")) {
-                    return RouteDecision.sync(PendingMessage.ofString("成绩ID列表包含非法值。" + RSC_USAGE));
-                }
-
-                ShortcutTarget target = parseTarget(arg, platform, senderUserId);
-                if (target.isError()) {
-                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
-                }
-                if (!target.isMacro()) {
+                if (args.length < 1 || args.length > 2) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
 
                 if (groupId == null || groupId.isBlank()) {
-                    return RouteDecision.sync(PendingMessage.ofString("/rsc 快捷查询仅支持群聊使用。"));
+                    return RouteDecision.sync(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
                 }
 
-                List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
-                if (groupBoundUids.isEmpty()) {
-                    return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
+                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                String[] uidArray = groupBoundUids.stream()
-                        .map(String::valueOf)
-                        .toArray(String[]::new);
-                return queueReplayTask("rsc", () -> APIHelper.createReplayShowcaseTask(target, uidArray));
+                String extraUidArg = args.length == 2 ? args[1] : null;
+                UidListResolution uidListResolution = resolveRscUidList(platform, groupId, extraUidArg);
+                if (uidListResolution.errorMessage() != null) {
+                    return RouteDecision.sync(PendingMessage.ofString(uidListResolution.errorMessage()));
+                }
+                String[] uidArray = uidListResolution.uids();
+
+                if (target.isMacro()) {
+                    return queueReplayTask("rsc", () -> APIHelper.createReplayShowcaseTask(target, uidArray));
+                }
+
+                if (target.explicitId() == null) {
+                    return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
+                }
+                return queueReplayTask("rsc", () -> APIHelper.createReplayRenderTaskByBeatmap(target.explicitId(), uidArray));
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -380,7 +375,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         /m <铺面ID> - 获取铺面图谱
                         /ms <铺面集ID> - 获取铺面集图谱
                         /r <成绩ID或快捷查询> - 生成成绩回放视频
-                        /rsc <成绩ID列表或快捷查询> - 生成同屏回放视频
+                        /rsc <铺面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
                         /sms <关键字> - 搜索铺面集
                         /c <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
                         /lb [铺面ID] - /c 的别名（省略参数时走绑定用户）
@@ -505,25 +500,36 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         return new UidResolution(null, null);
     }
 
-    private String parseScoreIdCsv(String rawCsv) {
-        if (rawCsv == null || rawCsv.isBlank()) {
-            return null;
+    private UidListResolution resolveRscUidList(String platform, String groupId, String extraUidArg) {
+        List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
+        if (groupBoundUids.isEmpty()) {
+            return new UidListResolution(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
         }
 
-        String[] scoreTokens = rawCsv.split(",");
-        if (scoreTokens.length == 0) {
-            return null;
-        }
+        Set<String> merged = new LinkedHashSet<>();
+        groupBoundUids.stream().map(String::valueOf).forEach(merged::add);
 
-        String[] normalized = new String[scoreTokens.length];
-        for (int i = 0; i < scoreTokens.length; i++) {
-            Long scoreId = parsePositiveLong(scoreTokens[i].trim());
-            if (scoreId == null) {
-                return null;
+        if (extraUidArg != null) {
+            String trimmed = extraUidArg.trim();
+            if (!trimmed.startsWith("+")) {
+                return new UidListResolution(null, "追加用户ID列表必须以 + 开头。" + RSC_USAGE);
             }
-            normalized[i] = String.valueOf(scoreId);
+            String body = trimmed.substring(1).trim();
+            if (body.isEmpty()) {
+                return new UidListResolution(null, "追加用户ID列表不能为空。" + RSC_USAGE);
+            }
+
+            String[] extraTokens = body.split(",");
+            for (String token : extraTokens) {
+                Integer uid = parsePositiveInt(token.trim());
+                if (uid == null) {
+                    return new UidListResolution(null, "追加用户ID列表包含非法值。" + RSC_USAGE);
+                }
+                merged.add(String.valueOf(uid));
+            }
         }
-        return String.join(",", normalized);
+
+        return new UidListResolution(merged.toArray(String[]::new), null);
     }
 
     private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
@@ -725,6 +731,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private record UidResolution(Integer uid, String errorMessage) {
+    }
+
+    private record UidListResolution(String[] uids, String errorMessage) {
     }
 
     protected record RouteDecision(PendingMessage initialMessage, ApiTask apiTask) {

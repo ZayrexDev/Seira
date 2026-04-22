@@ -343,6 +343,18 @@ public class APIHelper {
         return createReplayTask(target);
     }
 
+    public static ReplayTaskInfo createReplayRenderTaskByBeatmap(Long beatmapId, String[] uids) {
+        if (beatmapId == null || beatmapId <= 0) {
+            throw new RuntimeException("铺面ID无效。");
+        }
+        if (uids == null || uids.length == 0) {
+            throw new RuntimeException("回放渲染需要至少一个玩家ID。");
+        }
+
+        String uidsParam = String.join(",", uids);
+        return createReplayTask("/replay/render?m=" + beatmapId + "&u=" + uidsParam);
+    }
+
     public static ReplayTaskInfo createReplayShowcaseTaskByScores(String scoreIdsCsv) {
         return createReplayTask("/replay/showcase?s=" + scoreIdsCsv);
     }
@@ -424,15 +436,7 @@ public class APIHelper {
                     ? data.get("position").getAsInt()
                     : null;
 
-            final String title = getField(data, "title");
-            final String artist = getField(data, "artist");
-            final String version = getField(data, "version");
-            final String username = getField(data, "username");
-            final String rank = getField(data, "rank");
-            final String accuracy = getField(data, "accuracy");
-            final String star = getField(data, "star");
-
-            return new ReplayTaskInfo(taskId, status, position, title + " - " + artist + " [" + version + " " + star + "]\n" + username + " | " + rank + " | " + accuracy);
+            return new ReplayTaskInfo(taskId, status, position, buildReplayTaskMessage(data));
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
@@ -441,9 +445,87 @@ public class APIHelper {
         }
     }
 
-    private static String getField(JsonObject data, String title) {
-        return data.get("score") != null && data.get("score").isJsonObject()
-                ? data.get("score").getAsJsonObject().get(title).getAsString() : null;
+    private static String buildReplayTaskMessage(JsonObject data) {
+        if (data.has("scores") && data.get("scores").isJsonArray()) {
+            StringBuilder sb = new StringBuilder();
+            JsonArray scores = data.getAsJsonArray("scores");
+            for (JsonElement element : scores) {
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                String line = buildScoreLine(element.getAsJsonObject());
+                if (line == null) {
+                    continue;
+                }
+                if (!sb.isEmpty()) {
+                    sb.append("\n");
+                }
+                sb.append(line);
+            }
+            return sb.isEmpty() ? null : sb.toString();
+        }
+
+        JsonObject score = data.has("score") && data.get("score").isJsonObject()
+                ? data.getAsJsonObject("score")
+                : null;
+        if (score == null) {
+            return null;
+        }
+
+        String title = getScoreField(score, "title");
+        String artist = getScoreField(score, "artist");
+        String version = getScoreField(score, "version");
+        String star = getScoreField(score, "star");
+
+        StringBuilder sb = new StringBuilder();
+        if (title != null || artist != null || version != null || star != null) {
+            sb.append(orDash(title))
+                    .append(" - ")
+                    .append(orDash(artist))
+                    .append(" [")
+                    .append(orDash(version))
+                    .append(" ")
+                    .append(orDash(star))
+                    .append("]");
+        }
+
+        String scoreLine = buildScoreLine(score);
+        if (scoreLine != null) {
+            if (!sb.isEmpty()) {
+                sb.append("\n");
+            }
+            sb.append(scoreLine);
+        }
+
+        return sb.isEmpty() ? null : sb.toString();
+    }
+
+    private static String buildScoreLine(JsonObject score) {
+        String username = getScoreField(score, "username");
+        String rank = getScoreField(score, "rank");
+        String accuracy = getScoreField(score, "accuracy");
+        String pp = getScoreField(score, "pp");
+
+        if (username == null && rank == null && accuracy == null && pp == null) {
+            return null;
+        }
+
+        return orDash(username) + " - " + orDash(rank) + " - " + orDash(accuracy) + " - " + orDash(pp);
+    }
+
+    private static String getScoreField(JsonObject score, String field) {
+        if (score == null || !score.has(field) || score.get(field).isJsonNull()) {
+            return null;
+        }
+        try {
+            return score.get(field).getAsString();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String orDash(String value) {
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private static void waitReplayDone(String taskId) {
