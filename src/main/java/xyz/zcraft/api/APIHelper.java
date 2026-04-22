@@ -39,7 +39,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to best-of-N! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取 BoN 失败");
             }
 
             byte[] imageBytes = send.body();
@@ -68,7 +68,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to get group leaderboard! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取群排行失败");
             }
 
             byte[] imageBytes = send.body();
@@ -89,7 +89,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to get leaderboard! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取排行失败");
             }
 
             byte[] imageBytes = send.body();
@@ -110,10 +110,11 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to get daily! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取每日挑战失败");
             }
 
             final Response r = GSON.fromJson(send.body(), Response.class);
+            ensureApiSuccess(r, "获取每日挑战失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
             return String.format(
@@ -146,10 +147,11 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to get multiplayer rooms! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
             }
 
             final Response r = GSON.fromJson(send.body(), Response.class);
+            ensureApiSuccess(r, "获取多人房间失败");
             final JsonArray data = r.getData().getAsJsonArray();
 
             final StringBuilder sb = new StringBuilder("=== 进行中的多人游戏 ===\n");
@@ -173,7 +175,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to get recent! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取最近成绩失败");
             }
 
             byte[] imageBytes = send.body();
@@ -196,7 +198,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to get beatmap! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取铺面失败");
             }
 
             byte[] imageBytes = send.body();
@@ -244,7 +246,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to get beatmapset! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取铺面集失败");
             }
 
             byte[] imageBytes = send.body();
@@ -272,7 +274,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to get score! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "获取成绩失败");
             }
 
             byte[] imageBytes = send.body();
@@ -293,10 +295,11 @@ public class APIHelper {
             final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw new RuntimeException("Failed to search beatmapset! Status code: " + send.statusCode());
+                throw parseHttpError(send.body(), send.statusCode(), "搜索铺面集失败");
             }
 
             final Response response = GSON.fromJson(send.body(), Response.class);
+            ensureApiSuccess(response, "搜索铺面集失败");
             final JsonArray data = response.getData().getAsJsonArray();
 
             final LinkedList<SearchResultItem> items = new LinkedList<>();
@@ -343,7 +346,7 @@ public class APIHelper {
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                throw new RuntimeException("Failed to cleanup replay video! Status code: " + response.statusCode());
+                throw parseHttpError(response.body(), response.statusCode(), "清理回放视频失败");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -361,6 +364,10 @@ public class APIHelper {
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                throw parseHttpError(response.body(), response.statusCode(), "回放渲染请求失败");
+            }
 
             Response payload = GSON.fromJson(response.body(), Response.class);
             ensureApiSuccess(payload, "回放渲染请求失败");
@@ -405,6 +412,10 @@ public class APIHelper {
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
+            if (response.statusCode() != 200) {
+                throw parseHttpError(response.body(), response.statusCode(), "查询回放渲染状态失败");
+            }
+
             Response payload = GSON.fromJson(response.body(), Response.class);
             ensureApiSuccess(payload, "查询回放渲染状态失败");
             JsonObject data = requireDataObject(payload, "回放渲染状态响应缺少data");
@@ -435,7 +446,61 @@ public class APIHelper {
             throw new RuntimeException(fallbackMessage);
         }
         if (!payload.isSuccess()) {
-            throw new RuntimeException(payload.getMessage() != null ? payload.getMessage() : fallbackMessage);
+            Integer errorCode = extractErrorCode(payload);
+            String message = payload.getMessage() != null ? payload.getMessage() : fallbackMessage;
+            throw new ApiRequestException(errorCode, message);
+        }
+    }
+
+    private static RuntimeException parseHttpError(String responseBody, int statusCode, String fallbackMessage) {
+        Integer errorCode = null;
+        String message = null;
+        try {
+            JsonObject root = GSON.fromJson(responseBody, JsonObject.class);
+            if (root != null) {
+                if (root.has("message") && root.get("message").isJsonPrimitive()) {
+                    message = root.get("message").getAsString();
+                }
+                // Error code is primarily returned as Response.data.code.
+                if (root.has("data") && root.get("data").isJsonObject()) {
+                    JsonObject data = root.getAsJsonObject("data");
+                    errorCode = readCodeFromJsonObject(data);
+                }
+                if (errorCode == null) {
+                    errorCode = readCodeFromJsonObject(root);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        String resolvedMessage = (message != null && !message.isBlank())
+                ? message
+                : fallbackMessage + "（HTTP " + statusCode + "）";
+        return new ApiRequestException(errorCode, resolvedMessage);
+    }
+
+    private static RuntimeException parseHttpError(byte[] responseBody, int statusCode, String fallbackMessage) {
+        String bodyAsText = responseBody == null ? null : new String(responseBody, StandardCharsets.UTF_8);
+        return parseHttpError(bodyAsText, statusCode, fallbackMessage);
+    }
+
+    private static Integer extractErrorCode(Response payload) {
+        // Error code is returned as Response.data.code.
+        if (payload.getData() != null && payload.getData().isJsonObject()) {
+            JsonObject data = payload.getData().getAsJsonObject();
+            return readCodeFromJsonObject(data);
+        }
+        return null;
+    }
+
+    private static Integer readCodeFromJsonObject(JsonObject object) {
+        if (object == null || !object.has("code") || !object.get("code").isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return object.get("code").getAsInt();
+        } catch (Exception ignored) {
+            return null;
         }
     }
 

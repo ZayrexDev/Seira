@@ -5,7 +5,9 @@ import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
 import xyz.zcraft.Seira;
 import xyz.zcraft.api.APIHelper;
+import xyz.zcraft.api.ApiRequestException;
 import xyz.zcraft.binding.UserBindingStore;
+import xyz.zcraft.data.ErrorCode;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.data.PendingMessage;
@@ -26,6 +28,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
     private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$"); // bo25, rs1
     private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$"); // 12345#1
+    private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
+    private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
     private final PlatformMessageSender messageSender;
 
     protected AbstractCommandGatewayClient(URI serverUri, PlatformMessageSender messageSender) {
@@ -176,23 +180,34 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             }
             case "m" -> {
                 if (args.length >= 1) {
-                    ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                    TargetResolution targetResolution = resolveTargetWithOptionalMention(args, platform, senderUserId);
+                    ShortcutTarget target = targetResolution.target();
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
 
-                    String mod = args.length == 2 ? args[1] : null;
+                    if (args.length > targetResolution.consumedArgs() + 1) {
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID 或 快捷查询> [Mod]"));
+                    }
+
+                    String mod = args.length == targetResolution.consumedArgs() + 1
+                            ? args[targetResolution.consumedArgs()]
+                            : null;
                     return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(target, mod)));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/m <铺面ID 或 快捷查询> [Mod]"));
                 }
             }
             case "s" -> {
-                if (args.length != 1) {
+                if (args.length < 1 || args.length > 2) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/s <成绩ID 或 快捷查询>"));
                 }
 
-                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, platform, senderUserId);
+                if (args.length != targetResolution.consumedArgs()) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/s <成绩ID 或 快捷查询>"));
+                }
+                ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
@@ -200,11 +215,15 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
             }
             case "r" -> {
-                if (args.length != 1) {
+                if (args.length < 1 || args.length > 2) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/r <成绩ID 或 快捷查询>"));
                 }
 
-                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, platform, senderUserId);
+                if (args.length != targetResolution.consumedArgs()) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/r <成绩ID 或 快捷查询>"));
+                }
+                ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
@@ -226,11 +245,15 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 );
             }
             case "ms" -> {
-                if (args.length != 1) {
+                if (args.length < 1 || args.length > 2) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
                 }
 
-                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, platform, senderUserId);
+                if (args.length != targetResolution.consumedArgs()) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
+                }
+                ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
@@ -260,32 +283,37 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
                     return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getLeaderboard(new String[]{String.valueOf(uid)})));
-                } else if (args.length == 1) {
-                    ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                } else if (args.length == 1 || args.length == 2) {
+                    TargetResolution targetResolution = resolveTargetWithOptionalMention(args, platform, senderUserId);
+                    ShortcutTarget target = targetResolution.target();
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
-                    if (groupId != null && !groupId.isBlank()) {
-                        List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
-                        if (groupBoundUids.isEmpty()) {
-                            return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
+
+                    int remainingArgs = args.length - targetResolution.consumedArgs();
+                    if (remainingArgs == 0) {
+                        if (groupId != null && !groupId.isBlank()) {
+                            List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(platform, groupId);
+                            if (groupBoundUids.isEmpty()) {
+                                return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
+                            }
+                            String[] uidArray = groupBoundUids.stream()
+                                    .map(String::valueOf)
+                                    .toArray(String[]::new);
+                            return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, uidArray)));
                         }
-                        String[] uidArray = groupBoundUids.stream()
-                                .map(String::valueOf)
-                                .toArray(String[]::new);
-                        return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, uidArray)));
+                        Integer uid = resolveBoundUid(platform, senderUserId);
+                        if (uid == null) {
+                            return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
+                        }
+                        return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, new String[]{String.valueOf(uid)})));
                     }
-                    Integer uid = resolveBoundUid(platform, senderUserId);
-                    if (uid == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
+
+                    if (remainingArgs != 1) {
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     }
-                    return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, new String[]{String.valueOf(uid)})));
-                } else if (args.length == 2) {
-                    ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
-                    if (target.isError()) {
-                        return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
-                    }
-                    String[] uidTokens = args[1].split(",");
+
+                    String[] uidTokens = args[targetResolution.consumedArgs()].split(",");
                     if (uidTokens.length == 0) {
                         return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     }
@@ -332,6 +360,10 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private ShortcutTarget parseTarget(String arg, String platform, String senderUserId) {
+        return parseTarget(arg, platform, senderUserId, false);
+    }
+
+    private ShortcutTarget parseTarget(String arg, String platform, String senderUserId, boolean mentionedUser) {
         Matcher setMatcher = SET_MACRO_PATTERN.matcher(arg.trim());
         if (setMatcher.matches()) {
             Long setId = parsePositiveLong(setMatcher.group(1));
@@ -355,7 +387,10 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
             Integer uid = resolveBoundUid(platform, senderUserId);
             if (uid == null) {
-                return new ShortcutTarget(null, null, null, null, "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>");
+                String errorMessage = mentionedUser
+                        ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
+                        : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>";
+                return new ShortcutTarget(null, null, null, null, errorMessage);
             }
 
             return new ShortcutTarget(null, uid, type, index, null);
@@ -367,6 +402,47 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         }
 
         return new ShortcutTarget(id, null, null, null, null);
+    }
+
+    private TargetResolution resolveTargetWithOptionalMention(String[] args, String platform, String senderUserId) {
+        if (args.length >= 2 && isUserMacro(args[1])) {
+            String mentionedUserId = extractMentionedUserId(args[0]);
+            if (mentionedUserId != null) {
+                return new TargetResolution(parseTarget(args[1], platform, mentionedUserId, true), 2);
+            }
+            if (looksLikeMention(args[0])) {
+                return new TargetResolution(new ShortcutTarget(null, null, null, null, "@用户格式无效，请使用@用户后再输入快捷查询（如 rs2）。"), 2);
+            }
+        }
+        return new TargetResolution(parseTarget(args[0], platform, senderUserId), 1);
+    }
+
+    private boolean isUserMacro(String arg) {
+        return USER_MACRO_PATTERN.matcher(arg.trim()).matches();
+    }
+
+    private boolean looksLikeMention(String token) {
+        String trimmed = token == null ? "" : token.trim();
+        return trimmed.startsWith("@") || trimmed.startsWith("[CQ:at,");
+    }
+
+    private String extractMentionedUserId(String token) {
+        if (token == null) {
+            return null;
+        }
+
+        String trimmed = token.trim();
+        Matcher cqMatcher = CQ_AT_PATTERN.matcher(trimmed);
+        if (cqMatcher.matches()) {
+            return cqMatcher.group(1);
+        }
+
+        Matcher plainMatcher = PLAIN_AT_PATTERN.matcher(trimmed);
+        if (plainMatcher.matches()) {
+            return plainMatcher.group(1);
+        }
+
+        return null;
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
@@ -387,7 +463,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 sendOutboundMessage(targetId, messageId, groupMessage, response, messageSeqCounter);
             }
         } catch (Exception e) {
-            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("请求处理失败，请稍后再试。"), messageSeqCounter);
+            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
             LOG.error("Failed to execute API task for message {}", messageId, e);
         } finally {
             try {
@@ -398,6 +474,47 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
             API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
         }
+    }
+
+    private String resolveErrorMessage(Exception exception) {
+        Throwable cursor = exception;
+        while (cursor != null) {
+            if (cursor instanceof ApiRequestException apiRequestException) {
+                String mapped = mapErrorCodeMessage(apiRequestException.getErrorCode());
+                if (mapped != null) {
+                    return mapped;
+                }
+
+                String rawMessage = apiRequestException.getMessage();
+                if (rawMessage != null && !rawMessage.isBlank()) {
+                    return rawMessage;
+                }
+            }
+            cursor = cursor.getCause();
+        }
+        return "请求处理失败，请稍后再试。";
+    }
+
+    private String mapErrorCodeMessage(Integer code) {
+        ErrorCode errorCode = ErrorCode.fromCode(code);
+        if (errorCode == null) {
+            return null;
+        }
+
+        return switch (errorCode) {
+            case NO_BEATMAP_FOUND -> "未找到对应铺面，请检查输入后重试。";
+            case NO_BEATMAPSET_FOUND -> "未找到对应铺面集，请检查输入后重试。";
+            case NO_USER_FOUND -> "未找到对应玩家，请检查玩家ID后重试。";
+            case NO_SCORE_FOUND -> "未找到对应成绩，请检查输入后重试。";
+            case NO_ROOM_FOUND -> "当前没有可用的多人房间信息。";
+            case ILLEGAL_ARGUMENT -> "请求参数不合法，请检查指令参数格式。";
+            case BEATMAP_FETCH_FAILED -> "获取铺面数据失败，请稍后重试。";
+            case BEATMAPSET_FETCH_FAILED -> "获取铺面集数据失败，请稍后重试。";
+            case USER_FETCH_FAILED -> "获取玩家数据失败，请稍后重试。";
+            case SCORE_FETCH_FAILED -> "获取成绩数据失败，请稍后重试。";
+            case REPLAY_UNAVAILABLE -> "该成绩暂不支持回放渲染。";
+            case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试。";
+        };
     }
 
     private void sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
@@ -472,6 +589,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
+    }
+
+    private record TargetResolution(ShortcutTarget target, int consumedArgs) {
     }
 
     protected record RouteDecision(PendingMessage initialMessage, ApiTask apiTask) {

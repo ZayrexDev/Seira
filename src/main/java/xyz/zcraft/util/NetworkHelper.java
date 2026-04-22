@@ -89,12 +89,13 @@ public class NetworkHelper {
                     .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
                     .build();
 
-            final String body = CLIENT.send(request, HttpResponse.BodyHandlers.ofString()).body();
-            return gson.fromJson(body, FileInfo.class);
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
+
     public static FileInfo uploadPrivateMediaBase64(AccessToken accessToken, String openId, int fileType, String base64) {
         try {
             JsonObject payload = new JsonObject();
@@ -107,11 +108,28 @@ public class NetworkHelper {
                     .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
                     .build();
 
-            final String body = CLIENT.send(request, HttpResponse.BodyHandlers.ofString()).body();
-            return gson.fromJson(body, FileInfo.class);
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            return parseUploadedFileInfo(response, "upload private media(base64)");
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static FileInfo parseUploadedFileInfo(HttpResponse<String> response, String action) {
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Failed to " + action + "! Status code: " + response.statusCode() + " body=" + response.body());
+        }
+
+        JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+        JsonObject data = root.has("data") && root.get("data").isJsonObject()
+                ? root.getAsJsonObject("data")
+                : root;
+
+        FileInfo fileInfo = gson.fromJson(data, FileInfo.class);
+        if (fileInfo == null || fileInfo.getFileInfo() == null || fileInfo.getFileInfo().isBlank()) {
+            throw new RuntimeException("Failed to " + action + ": missing file_info in response body=" + response.body());
+        }
+        return fileInfo;
     }
 
     private static HttpRequest.Builder newRequestBuilder(AccessToken accessToken) {
