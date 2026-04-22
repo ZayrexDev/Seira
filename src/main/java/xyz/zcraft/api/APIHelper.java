@@ -392,7 +392,11 @@ public class APIHelper {
                 throw new RuntimeException("回放渲染请求缺少任务ID");
             }
             String taskId = data.get("id").getAsString();
-            final String status = getField(data, "status");
+
+            String status = data.has("status") && !data.get("status").isJsonNull()
+                    ? data.get("status").getAsString()
+                    : null;
+
             Integer position = data.has("position") && !data.get("position").isJsonNull()
                     ? data.get("position").getAsInt()
                     : null;
@@ -415,9 +419,8 @@ public class APIHelper {
     }
 
     private static String getField(JsonObject data, String title) {
-        return data.has(title) && !data.get(title).isJsonNull()
-                ? data.get(title).getAsString()
-                : null;
+        return data.get("score") != null && data.get("score").isJsonObject()
+                ? data.get("score").getAsJsonObject().get(title).getAsString() : null;
     }
 
     private static void waitReplayDone(String taskId) {
