@@ -24,7 +24,7 @@ public class APIHelper {
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
     private static final int REPLAY_POLL_INTERVAL_MS = 5000;
-    private static final int REPLAY_MAX_POLL_ATTEMPTS = 45;
+    private static final int REPLAY_MAX_POLL_ATTEMPTS = 1000;
 
     static {
         ENDPOINT = Seira.getConfig().endpoint();
@@ -392,19 +392,32 @@ public class APIHelper {
                 throw new RuntimeException("回放渲染请求缺少任务ID");
             }
             String taskId = data.get("id").getAsString();
-            String status = data.has("status") && !data.get("status").isJsonNull()
-                    ? data.get("status").getAsString()
-                    : null;
+            final String status = getField(data, "status");
             Integer position = data.has("position") && !data.get("position").isJsonNull()
                     ? data.get("position").getAsInt()
                     : null;
-            return new ReplayTaskInfo(taskId, status, position);
+
+            final String title = getField(data, "title");
+            final String artist = getField(data, "artist");
+            final String version = getField(data, "version");
+            final String username = getField(data, "username");
+            final String rank = getField(data, "rank");
+            final String accuracy = getField(data, "accuracy");
+            final String star = getField(data, "star");
+
+            return new ReplayTaskInfo(taskId, status, position, title + " - " + artist + " [" + version + " " + star + "]\n" + username + " | " + rank + " | " + accuracy);
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Replay render request interrupted", e);
         }
+    }
+
+    private static String getField(JsonObject data, String title) {
+        return data.has(title) && !data.get(title).isJsonNull()
+                ? data.get(title).getAsString()
+                : null;
     }
 
     private static void waitReplayDone(String taskId) {
@@ -539,6 +552,6 @@ public class APIHelper {
     public record ReplayRenderResult(String videoUrl, String taskId) {
     }
 
-    public record ReplayTaskInfo(String taskId, String status, Integer position) {
+    public record ReplayTaskInfo(String taskId, String status, Integer position, String message) {
     }
 }

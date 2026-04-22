@@ -251,7 +251,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (taskInfo.position() != null) {
                     queuedText += "，队列位置：" + taskInfo.position();
                 }
-                queuedText += "。";
+                queuedText += "。回放信息：\n";
+                queuedText += taskInfo.message();
 
                 AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
                 return queueApiRequest(
