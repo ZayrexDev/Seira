@@ -343,6 +343,26 @@ public class APIHelper {
         return createReplayTask(target);
     }
 
+    public static ReplayTaskInfo createReplayShowcaseTaskByScores(String scoreIdsCsv) {
+        return createReplayTask("/replay/showcase?s=" + scoreIdsCsv);
+    }
+
+    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids) {
+        if (!target.isMacro() || target.boundUid() == null) {
+            throw new RuntimeException("同屏回放仅支持玩家快捷查询（如 rs1/bo1）。");
+        }
+        if (groupUids == null || groupUids.length == 0) {
+            throw new RuntimeException("同屏回放需要至少一个玩家ID。");
+        }
+
+        String groupUidsParam = String.join(",", groupUids);
+        String query = "/replay/showcase?of=" + target.macroType()
+                + "&i=" + target.macroIndex()
+                + "&us=" + target.boundUid()
+                + "&u=" + groupUidsParam;
+        return createReplayTask(query);
+    }
+
     public static ReplayRenderResult waitReplayVideo(String taskId) {
         try {
             waitReplayDone(taskId);
@@ -375,8 +395,11 @@ public class APIHelper {
     }
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target) {
+        return createReplayTask(getReplayRenderQuery(target));
+    }
+
+    private static ReplayTaskInfo createReplayTask(String query) {
         try {
-            String query = getReplayRenderQuery(target);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
                     .GET()
