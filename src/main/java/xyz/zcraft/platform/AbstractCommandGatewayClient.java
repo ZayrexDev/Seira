@@ -7,11 +7,7 @@ import xyz.zcraft.Seira;
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.ApiRequestException;
 import xyz.zcraft.binding.UserBindingStore;
-import xyz.zcraft.data.ErrorCode;
-import xyz.zcraft.data.FileInfo;
-import xyz.zcraft.data.Message;
-import xyz.zcraft.data.PendingMessage;
-import xyz.zcraft.data.ShortcutTarget;
+import xyz.zcraft.data.*;
 import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
@@ -138,14 +134,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
                     return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getBoN(n, uid)));
-                } else if(args.length == 0) {
+                } else if (args.length == 0) {
                     ShortcutTarget target = parseTarget("bo1", platform, senderUserId);
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
 
                     return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
-                }  else {
+                } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID/@用户]"));
                 }
             }
@@ -179,7 +175,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString("你还没有绑定玩家ID，请先使用 /bind <玩家ID>"));
                     }
                     return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getRecent(n, uid)));
-                } else if(args.length == 0) {
+                } else if (args.length == 0) {
                     ShortcutTarget target = parseTarget("rs1", platform, senderUserId);
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
@@ -251,8 +247,16 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (taskInfo.position() != null) {
                     queuedText += "，队列位置：" + taskInfo.position();
                 }
-                queuedText += "。回放信息：\n";
-                queuedText += taskInfo.message();
+
+                if (taskInfo.taskId() != null) {
+                    queuedText += "，请求ID：" + taskInfo.taskId();
+                }
+
+                queuedText += "。\n";
+
+                if (taskInfo.message() != null) {
+                    queuedText += taskInfo.message();
+                }
 
                 AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
                 return queueApiRequest(
@@ -495,7 +499,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(requestType, executor, () -> {});
+        return queueApiRequest(requestType, executor, () -> {
+        });
     }
 
     private RouteDecision queueApiRequest(String requestType, PendingMessage queuedNotice, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
