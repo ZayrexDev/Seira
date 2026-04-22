@@ -117,15 +117,21 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             case "bo", "top" -> {
                 if (args.length == 2) {
                     Integer n = parsePositiveInt(args[0]);
-                    Integer id = parsePositiveInt(args[1]);
-                    if (n == null || id == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID]"));
+                    if (n == null) {
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID/@用户]"));
                     }
-                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getBoN(n, id)));
+                    UidResolution uidResolution = resolveUidArgument(args[1], platform);
+                    if (uidResolution.errorMessage() != null) {
+                        return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
+                    }
+                    if (uidResolution.uid() == null) {
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID/@用户]"));
+                    }
+                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getBoN(n, uidResolution.uid())));
                 } else if (args.length == 1) {
                     Integer n = parsePositiveInt(args[0]);
                     if (n == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID]"));
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID/@用户]"));
                     }
                     Integer uid = resolveBoundUid(platform, senderUserId);
                     if (uid == null) {
@@ -140,7 +146,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
                     return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
                 }  else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID]"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/bo <个数> [玩家ID/@用户]"));
                 }
             }
             case "daily" -> {
@@ -152,15 +158,21 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             case "rs" -> {
                 if (args.length == 2) {
                     Integer n = parsePositiveInt(args[0]);
-                    Integer id = parsePositiveInt(args[1]);
-                    if (n == null || id == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID]"));
+                    if (n == null) {
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID/@用户]"));
                     }
-                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getRecent(n, id)));
+                    UidResolution uidResolution = resolveUidArgument(args[1], platform);
+                    if (uidResolution.errorMessage() != null) {
+                        return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
+                    }
+                    if (uidResolution.uid() == null) {
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID/@用户]"));
+                    }
+                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getRecent(n, uidResolution.uid())));
                 } else if (args.length == 1) {
                     Integer n = parsePositiveInt(args[0]);
                     if (n == null) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID]"));
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID/@用户]"));
                     }
                     Integer uid = resolveBoundUid(platform, senderUserId);
                     if (uid == null) {
@@ -175,7 +187,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
                     return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID]"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/rs <个数> [玩家ID/@用户]"));
                 }
             }
             case "m" -> {
@@ -352,8 +364,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         可用指令：
                         /bind <玩家ID> - 绑定你的玩家ID
                         /unbind - 解除你的玩家ID绑定
-                        /bo <个数> [玩家ID] - 获取BoN图谱
-                        /rs <个数> [玩家ID] - 获取最近成绩图谱
+                        /bo <个数> [玩家ID/@用户] - 获取BoN图谱
+                        /rs <个数> [玩家ID/@用户] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
                         /ms <铺面集ID> - 获取铺面集图谱
                         /r <成绩ID或快捷查询> - 生成成绩回放视频
@@ -457,6 +469,28 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         }
 
         return null;
+    }
+
+    private UidResolution resolveUidArgument(String arg, String platform) {
+        Integer explicitUid = parsePositiveInt(arg);
+        if (explicitUid != null) {
+            return new UidResolution(explicitUid, null);
+        }
+
+        String mentionedUserId = extractMentionedUserId(arg);
+        if (mentionedUserId != null) {
+            Integer boundUid = resolveBoundUid(platform, mentionedUserId);
+            if (boundUid == null) {
+                return new UidResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind <玩家ID>");
+            }
+            return new UidResolution(boundUid, null);
+        }
+
+        if (looksLikeMention(arg)) {
+            return new UidResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
+        }
+
+        return new UidResolution(null, null);
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
@@ -611,6 +645,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private record TargetResolution(ShortcutTarget target, int consumedArgs) {
+    }
+
+    private record UidResolution(Integer uid, String errorMessage) {
     }
 
     protected record RouteDecision(PendingMessage initialMessage, ApiTask apiTask) {
