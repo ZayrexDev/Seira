@@ -363,7 +363,7 @@ public class APIHelper {
                     .DELETE()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
+            if (!is2xx(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "清理回放视频失败");
             }
         } catch (IOException e) {
@@ -382,12 +382,10 @@ public class APIHelper {
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
+            Response payload = GSON.fromJson(response.body(), Response.class);
+            if (!is2xx(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "回放渲染请求失败");
             }
-
-            Response payload = GSON.fromJson(response.body(), Response.class);
             ensureApiSuccess(payload, "回放渲染请求失败");
             JsonObject data = requireDataObject(payload, "回放渲染请求缺少任务信息");
             if (!data.has("id") || data.get("id").isJsonNull()) {
@@ -436,12 +434,10 @@ public class APIHelper {
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
+            Response payload = GSON.fromJson(response.body(), Response.class);
+            if (!is2xx(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "查询回放渲染状态失败");
             }
-
-            Response payload = GSON.fromJson(response.body(), Response.class);
             ensureApiSuccess(payload, "查询回放渲染状态失败");
             JsonObject data = requireDataObject(payload, "回放渲染状态响应缺少data");
             if (!data.has("status") || data.get("status").isJsonNull()) {
@@ -516,6 +512,10 @@ public class APIHelper {
             return readCodeFromJsonObject(data);
         }
         return null;
+    }
+
+    private static boolean is2xx(int statusCode) {
+        return statusCode >= 200 && statusCode < 300;
     }
 
     private static Integer readCodeFromJsonObject(JsonObject object) {
