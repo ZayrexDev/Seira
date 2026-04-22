@@ -243,19 +243,17 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return RouteDecision.sync(PendingMessage.ofString(resolveErrorMessage(e)));
                 }
 
-                String queuedText = "生成请求正在等待中";
+                String queuedText = "生成请求已提交。";
                 if (taskInfo.position() != null) {
-                    queuedText += "，队列位置：" + taskInfo.position();
+                    queuedText += "\n队列位置：" + taskInfo.position();
                 }
 
                 if (taskInfo.taskId() != null) {
-                    queuedText += "，请求ID：" + taskInfo.taskId();
+                    queuedText += "\n请求ID：" + taskInfo.taskId();
                 }
 
-                queuedText += "。\n";
-
                 if (taskInfo.message() != null) {
-                    queuedText += taskInfo.message();
+                    queuedText += "\n" + taskInfo.message();
                 }
 
                 AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
