@@ -274,7 +274,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (target.explicitId() == null) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
-                return queueReplayTask("rsc", () -> APIHelper.createReplayRenderTaskByBeatmap(target.explicitId(), uidArray));
+                return queueReplayTask("rsc", () -> APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray));
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {

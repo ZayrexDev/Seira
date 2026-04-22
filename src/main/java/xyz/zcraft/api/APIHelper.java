@@ -343,7 +343,7 @@ public class APIHelper {
         return createReplayTask(target);
     }
 
-    public static ReplayTaskInfo createReplayRenderTaskByBeatmap(Long beatmapId, String[] uids) {
+    public static ReplayTaskInfo createShowcaseRenderTaskByBeatmap(Long beatmapId, String[] uids) {
         if (beatmapId == null || beatmapId <= 0) {
             throw new RuntimeException("铺面ID无效。");
         }
@@ -352,7 +352,7 @@ public class APIHelper {
         }
 
         String uidsParam = String.join(",", uids);
-        return createReplayTask("/replay/render?m=" + beatmapId + "&u=" + uidsParam);
+        return createReplayTask("/replay/showcase?m=" + beatmapId + "&u=" + uidsParam);
     }
 
     public static ReplayTaskInfo createReplayShowcaseTaskByScores(String scoreIdsCsv) {
