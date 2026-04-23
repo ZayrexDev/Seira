@@ -22,7 +22,6 @@ import java.util.Objects;
 
 public class APIHelper {
     private static final String ENDPOINT;
-    private static final String PUBLIC_URL;
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
     private static final int REPLAY_POLL_INTERVAL_MS = 5000;
@@ -30,7 +29,6 @@ public class APIHelper {
 
     static {
         ENDPOINT = Seira.getConfig().ostella().endpoint();
-        PUBLIC_URL = Seira.getConfig().ostella().publicUrl();
     }
 
     public static String getBoN(int n, int uid) {
@@ -362,15 +360,7 @@ public class APIHelper {
     public static ReplayRenderResult waitReplayVideo(String taskId) {
         try {
             waitReplayDone(taskId);
-            String videoUrl = "";
-            if(PUBLIC_URL != null && !PUBLIC_URL.isBlank()) {
-                videoUrl += PUBLIC_URL;
-            } else {
-                videoUrl += ENDPOINT;
-            }
-            videoUrl += "/replay/video/" + taskId + "/replay.mp4";
-
-            return new ReplayRenderResult(videoUrl, taskId);
+            return new ReplayRenderResult(ENDPOINT + "/replay/video/" + taskId + "/replay.mp4", taskId);
         } catch (RuntimeException _) {
             return null;
         }

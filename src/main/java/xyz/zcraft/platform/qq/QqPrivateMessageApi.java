@@ -9,9 +9,11 @@ import java.util.function.Supplier;
 
 public class QqPrivateMessageApi implements PlatformPrivateMessageApi {
     private final Supplier<AccessToken> tokenSupplier;
+    private final CosUploadService cosUploadService;
 
-    public QqPrivateMessageApi(Supplier<AccessToken> tokenSupplier) {
+    public QqPrivateMessageApi(Supplier<AccessToken> tokenSupplier, CosUploadService cosUploadService) {
         this.tokenSupplier = tokenSupplier;
+        this.cosUploadService = cosUploadService;
     }
 
     @Override
@@ -21,7 +23,8 @@ public class QqPrivateMessageApi implements PlatformPrivateMessageApi {
 
     @Override
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url) {
-        return NetworkHelper.uploadPrivateMedia(tokenSupplier.get(), userId, fileType, url);
+        String cosUrl = cosUploadService.uploadFromUrl(url, fileType);
+        return NetworkHelper.uploadPrivateMedia(tokenSupplier.get(), userId, fileType, cosUrl);
     }
 
     @Override
