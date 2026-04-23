@@ -244,7 +244,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
-                return queueApiRequest("r", () -> queueReplayTask("r", () -> APIHelper.createReplayRenderTask(target)).initialMessage());
+                return queueApiRequest("r", () -> queueReplayTask("r-r", () -> APIHelper.createReplayRenderTask(target)).initialMessage());
             }
             case "rsc" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -268,13 +268,13 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 String[] uidArray = uidListResolution.uids();
 
                 if (target.isMacro()) {
-                    return queueApiRequest("rsc", () -> queueReplayTask("rsc", () -> APIHelper.createReplayShowcaseTask(target, uidArray)).initialMessage());
+                    return queueApiRequest("rsc", () -> queueReplayTask("rsc-r", () -> APIHelper.createReplayShowcaseTask(target, uidArray)).initialMessage());
                 }
 
                 if (target.explicitId() == null) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
-                return queueApiRequest("rsc", () -> queueReplayTask("rsc", () -> APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray)).initialMessage());
+                return queueApiRequest("rsc", () -> queueReplayTask("rsc-r", () -> APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray)).initialMessage());
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
