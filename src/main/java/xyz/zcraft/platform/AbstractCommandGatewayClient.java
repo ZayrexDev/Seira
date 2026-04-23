@@ -244,7 +244,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
-                return queueApiRequest("r", () -> queueReplayTask("r-r", () -> APIHelper.createReplayRenderTask(target)).initialMessage());
+                return queueReplayTask("r", () -> APIHelper.createReplayRenderTask(target));
             }
             case "rsc" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -268,13 +268,13 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 String[] uidArray = uidListResolution.uids();
 
                 if (target.isMacro()) {
-                    return queueApiRequest("rsc", () -> queueReplayTask("rsc-r", () -> APIHelper.createReplayShowcaseTask(target, uidArray)).initialMessage());
+                    return queueReplayTask("rsc", () -> APIHelper.createReplayShowcaseTask(target, uidArray));
                 }
 
                 if (target.explicitId() == null) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
-                return queueApiRequest("rsc", () -> queueReplayTask("rsc-r", () -> APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray)).initialMessage());
+                return queueReplayTask("rsc", () -> APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray));
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -533,46 +533,45 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     }
 
     private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
-        APIHelper.ReplayTaskInfo taskInfo;
-        try {
-            taskInfo = creator.create();
-        } catch (Exception e) {
-            return RouteDecision.sync(PendingMessage.ofString(resolveErrorMessage(e)));
-        }
-
-        String queuedText = "生成请求已提交。";
-        if (taskInfo.position() != null) {
-            queuedText += "\n队列位置：" + taskInfo.position();
-        }
-        if (taskInfo.taskId() != null) {
-            queuedText += "\n请求ID：" + taskInfo.taskId();
-        }
-        if (taskInfo.message() != null) {
-            queuedText += "\n" + taskInfo.message();
-        }
-
-        AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
-        APIHelper.ReplayTaskInfo finalTaskInfo = taskInfo;
+        AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
         return queueApiRequest(
                 requestType,
-                PendingMessage.ofString(queuedText),
                 () -> {
-                    APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(finalTaskInfo.taskId());
-                    replayResultRef.set(result);
-                    return PendingMessage.ofVideoUrl(result.videoUrl());
+                    APIHelper.ReplayTaskInfo taskInfo = creator.create();
+                    taskInfoRef.set(taskInfo);
+
+                    String queuedText = "生成请求已提交。";
+                    if (taskInfo.position() != null) {
+                        queuedText += "\n队列位置：" + taskInfo.position();
+                    }
+                    if (taskInfo.taskId() != null) {
+                        queuedText += "\n请求ID：" + taskInfo.taskId();
+                    }
+                    if (taskInfo.message() != null) {
+                        queuedText += "\n" + taskInfo.message();
+                    }
+                    return PendingMessage.ofString(queuedText);
                 },
                 () -> {
-                    APIHelper.ReplayRenderResult result = replayResultRef.get();
-                    if (result != null) {
-                        APIHelper.cleanupReplayVideo(result.taskId());
+                    APIHelper.ReplayTaskInfo taskInfo = taskInfoRef.get();
+                    if (taskInfo == null || taskInfo.taskId() == null || taskInfo.taskId().isBlank()) {
+                        return PendingMessage.ofString("回放任务未返回有效请求ID，无法获取视频结果。请稍后重试。");
+                    }
+
+                    APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
+                    try {
+                        return PendingMessage.ofVideoUrl(result.videoUrl());
+                    } finally {
+                        if (result.taskId() != null && !result.taskId().isBlank()) {
+                            APIHelper.cleanupReplayVideo(result.taskId());
+                        }
                     }
                 }
         );
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(requestType, executor, () -> {
-        });
+        return queueApiRequest(requestType, executor, () -> null);
     }
 
     private RouteDecision queueApiRequest(String requestType, PendingMessage queuedNotice, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
@@ -593,15 +592,15 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             if (response != null) {
                 sendOutboundMessage(targetId, messageId, groupMessage, response, messageSeqCounter);
             }
+
+            PendingMessage postResponse = apiTask.postProcessor().execute();
+            if (postResponse != null) {
+                sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
+            }
         } catch (Exception e) {
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
             LOG.error("Failed to execute API task for message {}", messageId, e);
         } finally {
-            try {
-                apiTask.postProcessor().execute();
-            } catch (Exception e) {
-                LOG.warn("Failed to run post-processor for message {}", messageId, e);
-            }
             long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
             API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
         }
@@ -656,6 +655,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         message.setMsgSeq(messageSeqCounter.getAndIncrement());
 
         if (pendingMsg.getFileUrl() != null) {
+            LOG.info("Uploading media for {}", messageId);
             FileInfo fileInfo = groupMessage
                     ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
                     : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
@@ -721,7 +721,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     @FunctionalInterface
     private interface ApiTaskPostProcessor {
-        void execute();
+        PendingMessage execute();
     }
 
     private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
