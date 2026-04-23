@@ -370,7 +370,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return RouteDecision.sync(PendingMessage.ofString("用法：/rstat <任务ID>"));
                 }
 
-                return queueApiRequest("rstat", () -> PendingMessage.ofString(APIHelper.getRenderStat(args[0])));
+                return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(args[0])));
             }
             case "help" -> {
                 return RouteDecision.sync(PendingMessage.ofString("""
