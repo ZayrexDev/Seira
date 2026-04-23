@@ -10,14 +10,14 @@ ostella:
 
 # === 适配器设置 ===
 platforms:
-  # === QQ 官方机器人 适配器 ===
+  # --- QQ 官方机器人 适配器 ---
   qq:
     appId: ""
     appSecret: ""
     # 事件订阅，33554432 是消息相关权限的总和，不建议更改
     # 具体权限可以参考 https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html
     intents: 33554432
-  # === Napcat 适配器 ===
+  # --- Napcat 适配器 ---
   napcat:
     wsEndpoint: "ws://127.0.0.1:3001"
     httpEndpoint: "http://127.0.0.1:3000"

@@ -42,7 +42,7 @@ public class Seira {
         try {
             config = ConfigLoader.loadConfig();
         } catch (Exception e) {
-            LOG.error("Invalid configuration! Please check your .env file.");
+            LOG.error("Invalid configuration! Please check your config.yml file.");
             System.exit(1);
             return;
         }
