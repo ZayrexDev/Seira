@@ -4,7 +4,6 @@ import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.platform.PlatformPrivateMessageApi;
 import xyz.zcraft.util.AccessToken;
-import xyz.zcraft.util.NetworkHelper;
 
 import java.util.function.Supplier;
 

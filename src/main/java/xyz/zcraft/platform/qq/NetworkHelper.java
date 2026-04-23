@@ -1,4 +1,4 @@
-package xyz.zcraft.util;
+package xyz.zcraft.platform.qq;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
+import xyz.zcraft.util.AccessToken;
 
 import java.io.IOException;
 import java.net.URI;

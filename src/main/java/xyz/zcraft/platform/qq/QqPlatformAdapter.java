@@ -5,7 +5,6 @@ import xyz.zcraft.platform.BotPlatformAdapter;
 import xyz.zcraft.platform.PlatformGatewayClient;
 import xyz.zcraft.platform.PlatformMessageSender;
 import xyz.zcraft.util.AccessToken;
-import xyz.zcraft.util.NetworkHelper;
 
 import java.net.URI;
 import java.util.function.Supplier;
