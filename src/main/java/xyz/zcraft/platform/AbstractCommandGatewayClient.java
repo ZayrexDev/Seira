@@ -534,6 +534,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
+        AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
         return queueApiRequest(
                 requestType,
                 () -> {
@@ -559,30 +560,42 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     }
 
                     APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
-                    try {
-                        return PendingMessage.ofVideoUrl(result.videoUrl());
-                    } finally {
-                        if (result.taskId() != null && !result.taskId().isBlank()) {
-                            APIHelper.cleanupReplayVideo(result.taskId());
-                        }
+                    replayResultRef.set(result);
+                    return PendingMessage.ofVideoUrl(result.videoUrl());
+                },
+                () -> {
+                    APIHelper.ReplayRenderResult result = replayResultRef.get();
+                    if (result != null && result.taskId() != null && !result.taskId().isBlank()) {
+                        APIHelper.cleanupReplayVideo(result.taskId());
                     }
                 }
         );
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(requestType, executor, () -> null);
+        return queueApiRequest(requestType, executor, () -> null, () -> {
+        });
     }
 
     private RouteDecision queueApiRequest(String requestType, PendingMessage queuedNotice, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
+        return queueApiRequest(requestType, queuedNotice, executor, postProcessor, () -> {
+        });
+    }
+
+    private RouteDecision queueApiRequest(String requestType, PendingMessage queuedNotice, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
         API_REQUEST_STATS.estimateAndEnqueue(requestType);
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor));
+        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer));
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
+        return queueApiRequest(requestType, executor, postProcessor, () -> {
+        });
+    }
+
+    private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
         long estimatedSeconds = API_REQUEST_STATS.estimateAndEnqueue(requestType);
         PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor));
+        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer));
     }
 
     private void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
@@ -601,6 +614,11 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
             LOG.error("Failed to execute API task for message {}", messageId, e);
         } finally {
+            try {
+                apiTask.finalizer().execute();
+            } catch (Exception e) {
+                LOG.warn("Failed to run finalizer for message {}", messageId, e);
+            }
             long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
             API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
         }
@@ -724,7 +742,12 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         PendingMessage execute();
     }
 
-    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
+    @FunctionalInterface
+    private interface ApiTaskFinalizer {
+        void execute();
+    }
+
+    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
     }
 
     private record TargetResolution(ShortcutTarget target, int consumedArgs) {
