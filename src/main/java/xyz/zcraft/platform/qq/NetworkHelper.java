@@ -82,7 +82,6 @@ public class NetworkHelper {
         try {
             JsonObject payload = new JsonObject();
             payload.addProperty("file_type", fileType);
-            url = "https://zcraftasserts-1302810751.cos.ap-shanghai.myqcloud.com/e0e033c7-afd8-4913-b0f5-039ee2d074d1.mp4";
             payload.addProperty("url", url);
             payload.addProperty("srv_send_msg", false);
 
