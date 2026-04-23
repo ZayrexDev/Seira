@@ -2,7 +2,6 @@ package xyz.zcraft.platform.qq;
 
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
-import xyz.zcraft.data.PendingMessage;
 import xyz.zcraft.platform.PlatformPrivateMessageApi;
 import xyz.zcraft.util.AccessToken;
 import xyz.zcraft.util.NetworkHelper;
@@ -23,10 +22,6 @@ public class QqPrivateMessageApi implements PlatformPrivateMessageApi {
 
     @Override
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url) {
-        if (fileType == PendingMessage.FILE_TYPE_VIDEO) {
-            String base64 = NetworkHelper.readUrlAsBase64(url);
-            return NetworkHelper.uploadPrivateMediaBase64(tokenSupplier.get(), userId, fileType, base64);
-        }
         return NetworkHelper.uploadPrivateMedia(tokenSupplier.get(), userId, fileType, url);
     }
 
