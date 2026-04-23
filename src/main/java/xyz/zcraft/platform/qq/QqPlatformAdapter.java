@@ -1,6 +1,6 @@
 package xyz.zcraft.platform.qq;
 
-import xyz.zcraft.Config;
+import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.platform.BotPlatformAdapter;
 import xyz.zcraft.platform.PlatformGatewayClient;
 import xyz.zcraft.platform.PlatformMessageSender;
@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 
 public class QqPlatformAdapter implements BotPlatformAdapter {
     @Override
-    public AccessToken getAccessToken(Config config) {
+    public AccessToken getAccessToken(AppConfig config) {
         return NetworkHelper.getAccessToken(config);
     }
 
@@ -29,7 +29,7 @@ public class QqPlatformAdapter implements BotPlatformAdapter {
     @Override
     public PlatformGatewayClient createGatewayClient(
             URI serverUri,
-            Config config,
+            AppConfig config,
             Supplier<AccessToken> tokenSupplier,
             PlatformMessageSender messageSender
     ) {

@@ -1,13 +1,13 @@
 package xyz.zcraft.platform;
 
-import xyz.zcraft.Config;
+import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.util.AccessToken;
 
 import java.net.URI;
 import java.util.function.Supplier;
 
 public interface BotPlatformAdapter {
-    AccessToken getAccessToken(Config config);
+    AccessToken getAccessToken(AppConfig config);
 
     String getGatewayEndpoint(AccessToken accessToken);
 
@@ -15,7 +15,7 @@ public interface BotPlatformAdapter {
 
     PlatformGatewayClient createGatewayClient(
             URI serverUri,
-            Config config,
+            AppConfig config,
             Supplier<AccessToken> tokenSupplier,
             PlatformMessageSender messageSender
     );

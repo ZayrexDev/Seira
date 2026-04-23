@@ -54,7 +54,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         LOG.info("Received {} message {} from {}: {}", groupMessage ? "group" : "private", messageId, senderUserId, rawContent);
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
-            String platform = Seira.getConfig().platform();
+            String platform = Seira.getConfig().seira().platform();
             if (groupMessage && groupId != null && !groupId.isBlank() && senderUserId != null && !senderUserId.isBlank()) {
                 UserBindingStore.upsertGroupMember(platform, groupId, senderUserId);
             }
@@ -90,7 +90,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         String command = parts[0].toLowerCase();
         String query = body.substring(command.length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
-        String platform = Seira.getConfig().platform();
+        String platform = Seira.getConfig().seira().platform();
 
         switch (command) {
             case "bind" -> {
