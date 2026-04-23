@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.LinkedList;
+import java.util.Objects;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -655,6 +656,50 @@ public class APIHelper {
             throw new RuntimeException(message);
         }
         return payload.getData().getAsJsonObject();
+    }
+
+    public static String getRenderStat(String jobId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/replay/status/" + jobId))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取渲染进度失败");
+            }
+
+            final Response r = GSON.fromJson(send.body(), Response.class);
+            ensureApiSuccess(r, "获取渲染进度失败");
+            final JsonObject data = r.getData().getAsJsonObject();
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("任务ID: ").append(jobId).append("\n");
+
+            final JsonElement jsonElement = data.get("status");
+            final String status = jsonElement != null ? jsonElement.getAsString() : null;
+
+            sb.append("状态: ").append(jsonElement != null ? switch (status){
+                case "done" -> "已完成";
+                case "failed" -> "失败";
+                case "timeout" -> "超时";
+                case "queued" -> "排队中";
+                case "rendering" -> "渲染中";
+                default -> "未知";
+            } : "未知").append("\n");
+
+            if(Objects.equals("rendering", status)) {
+                sb.append("进度: ").append(data.has("progress") && !data.get("progress").isJsonNull() ? data.get("progress").getAsString() : "未知").append("\n");
+                sb.append("速度: ").append(data.has("speed") && !data.get("speed").isJsonNull() ? data.get("speed").getAsString() : "未知").append("\n");
+                sb.append("预计时间: ").append(data.has("eta") && !data.get("eta").isJsonNull() ? data.get("eta").getAsString() : "未知").append("\n");
+            }
+
+            return sb.toString().trim();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId) {
