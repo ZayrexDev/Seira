@@ -371,30 +371,8 @@ public class APIHelper {
             videoUrl += "/replay/video/" + taskId;
 
             return new ReplayRenderResult(videoUrl, taskId);
-        } catch (RuntimeException ex) {
-            try {
-                cleanupReplayVideo(taskId);
-            } catch (RuntimeException ignored) {
-            }
-            throw ex;
-        }
-    }
-
-    public static void cleanupReplayVideo(String taskId) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/replay/video/" + taskId))
-                    .DELETE()
-                    .build();
-            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (codeNotOk(response.statusCode())) {
-                throw parseHttpError(response.body(), response.statusCode(), "清理回放视频失败");
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Replay cleanup interrupted", e);
+        } catch (RuntimeException _) {
+            return null;
         }
     }
 

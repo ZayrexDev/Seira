@@ -541,7 +541,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
-        AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
+
         return queueApiRequestUntilSubmit(
                 requestType,
                 () -> {
@@ -567,15 +567,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     }
 
                     APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
-                    replayResultRef.set(result);
-                    return PendingMessage.ofVideoUrl(result.videoUrl());
-                },
-                () -> {
-                    APIHelper.ReplayRenderResult result = replayResultRef.get();
-                    if (result != null && result.taskId() != null && !result.taskId().isBlank()) {
-                        APIHelper.cleanupReplayVideo(result.taskId());
+
+                    if (result != null) {
+                        return PendingMessage.ofVideoUrl(result.videoUrl());
+                    } else {
+                        return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
                     }
-                }
+                },
+                () -> {}
         );
     }
 
