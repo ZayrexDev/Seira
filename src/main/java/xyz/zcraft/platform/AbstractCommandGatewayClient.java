@@ -535,7 +535,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
         AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
-        return queueApiRequest(
+        return queueApiRequestUntilSubmit(
                 requestType,
                 () -> {
                     APIHelper.ReplayTaskInfo taskInfo = creator.create();
@@ -584,7 +584,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     private RouteDecision queueApiRequest(String requestType, PendingMessage queuedNotice, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
         API_REQUEST_STATS.estimateAndEnqueue(requestType);
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer));
+        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, false));
     }
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
@@ -595,15 +595,28 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
         long estimatedSeconds = API_REQUEST_STATS.estimateAndEnqueue(requestType);
         PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer));
+        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, false));
+    }
+
+    private RouteDecision queueApiRequestUntilSubmit(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
+        long estimatedSeconds = API_REQUEST_STATS.estimateAndEnqueue(requestType);
+        PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
+        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, true));
     }
 
     private void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
         long startedAt = System.nanoTime();
+        boolean statsCompleted = false;
         try {
             PendingMessage response = apiTask.executor().execute();
             if (response != null) {
                 sendOutboundMessage(targetId, messageId, groupMessage, response, messageSeqCounter);
+            }
+
+            if (apiTask.completeStatsAfterExecutor()) {
+                long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
+                API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
+                statsCompleted = true;
             }
 
             PendingMessage postResponse = apiTask.postProcessor().execute();
@@ -619,8 +632,10 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             } catch (Exception e) {
                 LOG.warn("Failed to run finalizer for message {}", messageId, e);
             }
-            long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
-            API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
+            if (!statsCompleted) {
+                long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
+                API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
+            }
         }
     }
 
@@ -747,7 +762,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         void execute();
     }
 
-    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
+    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer, boolean completeStatsAfterExecutor) {
     }
 
     private record TargetResolution(ShortcutTarget target, int consumedArgs) {
