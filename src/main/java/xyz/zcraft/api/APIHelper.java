@@ -325,21 +325,6 @@ public class APIHelper {
         }
     }
 
-    public static ReplayRenderResult prepareReplayVideo(ShortcutTarget target) {
-        ReplayTaskInfo taskInfo = createReplayTask(target);
-        String taskId = taskInfo.taskId();
-        try {
-            waitReplayDone(taskId);
-            return new ReplayRenderResult(ENDPOINT + "/replay/video/" + taskId, taskId);
-        } catch (RuntimeException ex) {
-            try {
-                cleanupReplayVideo(taskId);
-            } catch (RuntimeException ignored) {
-            }
-            throw ex;
-        }
-    }
-
     public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target) {
         return createReplayTask(target);
     }
@@ -354,10 +339,6 @@ public class APIHelper {
 
         String uidsParam = String.join(",", uids);
         return createReplayTask("/replay/showcase?m=" + beatmapId + "&u=" + uidsParam);
-    }
-
-    public static ReplayTaskInfo createReplayShowcaseTaskByScores(String scoreIdsCsv) {
-        return createReplayTask("/replay/showcase?s=" + scoreIdsCsv);
     }
 
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids) {
@@ -396,7 +377,7 @@ public class APIHelper {
                     .DELETE()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (!is2xx(response.statusCode())) {
+            if (codeNotOk(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "清理回放视频失败");
             }
         } catch (IOException e) {
@@ -419,7 +400,7 @@ public class APIHelper {
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             Response payload = GSON.fromJson(response.body(), Response.class);
-            if (!is2xx(response.statusCode())) {
+            if (codeNotOk(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "回放渲染请求失败");
             }
             ensureApiSuccess(payload, "回放渲染请求失败");
@@ -557,7 +538,7 @@ public class APIHelper {
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             Response payload = GSON.fromJson(response.body(), Response.class);
-            if (!is2xx(response.statusCode())) {
+            if (codeNotOk(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "查询回放渲染状态失败");
             }
             ensureApiSuccess(payload, "查询回放渲染状态失败");
@@ -636,8 +617,8 @@ public class APIHelper {
         return null;
     }
 
-    private static boolean is2xx(int statusCode) {
-        return statusCode >= 200 && statusCode < 300;
+    private static boolean codeNotOk(int statusCode) {
+        return statusCode < 200 || statusCode >= 300;
     }
 
     private static Integer readCodeFromJsonObject(JsonObject object) {
@@ -694,6 +675,45 @@ public class APIHelper {
                 sb.append("进度: ").append(data.has("progress") && !data.get("progress").isJsonNull() ? data.get("progress").getAsString() : "未知").append("\n");
                 sb.append("速度: ").append(data.has("speed") && !data.get("speed").isJsonNull() ? data.get("speed").getAsString() : "未知").append("\n");
                 sb.append("预计时间: ").append(data.has("eta") && !data.get("eta").isJsonNull() ? data.get("eta").getAsString() : "未知").append("\n");
+            }
+
+            return sb.toString().trim();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String getServerStatus() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/status"))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("服务器状态: \n");
+            sb.append("消息网关: ✅ 正常\n");
+            sb.append("oStella API: \n");
+
+            final Response response = GSON.fromJson(send.body(), Response.class);
+
+            if(send.statusCode() != 200
+                    || send.body() == null
+                    || response == null
+                    || !response.isSuccess()) {
+                sb.append("❌ 无法访问\n");
+            } else {
+                sb.append("✅ 正常\n");
+
+                if(response.getData() != null && response.getData().isJsonObject()) {
+                    JsonObject data = response.getData().getAsJsonObject();
+                    if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
+                        sb.append("osu!api: ").append(data.get("osu-api").getAsBoolean() ? "✅ 正常" : "❌ 无法访问").append("\n");
+                    }
+                }
             }
 
             return sb.toString().trim();

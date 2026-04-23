@@ -363,7 +363,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 }
             }
             case "status" -> {
-                return RouteDecision.sync(PendingMessage.ofString("服务器状态：正常"));
+                return RouteDecision.sync(PendingMessage.ofString(APIHelper.getServerStatus()));
             }
             case "rstat" -> {
                 if (args.length != 1) {
@@ -581,21 +581,6 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
         return queueApiRequest(requestType, executor, () -> null, () -> {
-        });
-    }
-
-    private RouteDecision queueApiRequest(String requestType, PendingMessage queuedNotice, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
-        return queueApiRequest(requestType, queuedNotice, executor, postProcessor, () -> {
-        });
-    }
-
-    private RouteDecision queueApiRequest(String requestType, PendingMessage queuedNotice, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
-        API_REQUEST_STATS.estimateAndEnqueue(requestType);
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, false));
-    }
-
-    private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor) {
-        return queueApiRequest(requestType, executor, postProcessor, () -> {
         });
     }
 
