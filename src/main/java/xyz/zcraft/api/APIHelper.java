@@ -696,7 +696,7 @@ public class APIHelper {
             StringBuilder sb = new StringBuilder();
             sb.append("服务器状态: \n");
             sb.append("消息网关: ✅ 正常\n");
-            sb.append("oStella API: \n");
+            sb.append("oStella API: ");
 
             final Response response = GSON.fromJson(send.body(), Response.class);
 
@@ -711,7 +711,7 @@ public class APIHelper {
                 if(response.getData() != null && response.getData().isJsonObject()) {
                     JsonObject data = response.getData().getAsJsonObject();
                     if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
-                        sb.append("osu!api: ").append(data.get("osu-api").getAsBoolean() ? "✅ 正常" : "❌ 无法访问").append("\n");
+                        sb.append("osu!API: ").append(data.get("osu-api").getAsBoolean() ? "✅ 正常" : "❌ 无法访问").append("\n");
                     }
                 }
             }
