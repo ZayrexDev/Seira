@@ -368,7 +368,7 @@ public class APIHelper {
             } else {
                 videoUrl += ENDPOINT;
             }
-            videoUrl += "/replay/video/" + taskId;
+            videoUrl += "/replay/video/" + taskId + "/replay.mp4";
 
             return new ReplayRenderResult(videoUrl, taskId);
         } catch (RuntimeException _) {
