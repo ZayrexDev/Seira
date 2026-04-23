@@ -3,6 +3,7 @@ package xyz.zcraft;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.binding.UserBindingStore;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.config.ConfigLoader;
 import xyz.zcraft.platform.BotPlatformAdapter;
@@ -46,6 +47,8 @@ public class Seira {
             System.exit(1);
             return;
         }
+
+        UserBindingStore.init(config.seira().sqlitePath());
 
         platformAdapter = BotPlatformAdapters.create(config);
         LOG.info("Selected platform adapter: {}", config.seira().platform());
