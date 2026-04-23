@@ -1,10 +1,10 @@
 package xyz.zcraft;
 
-import io.github.cdimascio.dotenv.Dotenv;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.binding.UserBindingStore;
+import xyz.zcraft.config.AppConfig;
+import xyz.zcraft.config.ConfigLoader;
 import xyz.zcraft.platform.BotPlatformAdapter;
 import xyz.zcraft.platform.BotPlatformAdapters;
 import xyz.zcraft.platform.PlatformGatewayClient;
@@ -12,6 +12,7 @@ import xyz.zcraft.platform.PlatformMessageSender;
 import xyz.zcraft.util.AccessToken;
 import xyz.zcraft.util.ThreadHelper;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -20,17 +21,34 @@ public class Seira {
     private static final Logger LOG = LogManager.getLogger(Seira.class);
     private static final Timer timer = new Timer("access-token-renewal", true);
     @Getter
-    private static Config config;
+    private static AppConfig config;
     private static AccessToken accessToken;
     private static BotPlatformAdapter platformAdapter;
 
     static void main() {
-        LOG.info("Loading .env ...");
-        final Dotenv env = Dotenv.load();
-        config = Config.fromEnv(env);
-        UserBindingStore.init(config.sqlitePath());
+        LOG.info("Loading config");
+
+        if(!ConfigLoader.configExists()) {
+            LOG.warn("Config file does not exist, copying default config. Please check your config file.");
+            try {
+                ConfigLoader.copyDefaultConfig();
+            } catch (IOException e) {
+                LOG.error("Failed to copy default config", e);
+            }
+
+            System.exit(0);
+        }
+
+        try {
+            config = ConfigLoader.loadConfig();
+        } catch (Exception e) {
+            LOG.error("Invalid configuration! Please check your config.yml file.");
+            System.exit(1);
+            return;
+        }
+
         platformAdapter = BotPlatformAdapters.create(config);
-        LOG.info("Selected platform adapter: {}", config.platform());
+        LOG.info("Selected platform adapter: {}", config.seira().platform());
 
         LOG.info("Getting access token");
         renewAccessToken();

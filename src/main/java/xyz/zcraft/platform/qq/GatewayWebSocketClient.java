@@ -7,7 +7,7 @@ import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.handshake.ServerHandshake;
-import xyz.zcraft.Config;
+import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.platform.AbstractCommandGatewayClient;
 import xyz.zcraft.platform.PlatformMessageSender;
 import xyz.zcraft.util.AccessToken;
@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
     private static final Logger LOG = LogManager.getLogger(GatewayWebSocketClient.class);
     private final Gson gson = new Gson();
-    private final Config config;
+    private final AppConfig config;
     private final Supplier<AccessToken> tokenSupplier;
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicLong sequence = new AtomicLong(-1);
@@ -31,7 +31,7 @@ public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
 
     public GatewayWebSocketClient(
             URI serverUri,
-            Config config,
+            AppConfig config,
             Supplier<AccessToken> tokenSupplier,
             PlatformMessageSender messageSender
     ) {
@@ -101,7 +101,7 @@ public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
     private void sendIdentify() {
         JsonObject data = new JsonObject();
         data.addProperty("token", "QQBot " + tokenSupplier.get().token());
-        data.addProperty("intents", config.intents());
+        data.addProperty("intents", config.platforms().qq().intents());
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);

@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import xyz.zcraft.Config;
+import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 
@@ -14,7 +14,6 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.Base64;
 
 public class NetworkHelper {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
@@ -38,11 +37,11 @@ public class NetworkHelper {
         }
     }
 
-    public static AccessToken getAccessToken(Config config) {
+    public static AccessToken getAccessToken(AppConfig config) {
         try {
             JsonObject payload = new JsonObject();
-            payload.addProperty("appId", config.appId());
-            payload.addProperty("clientSecret", config.appSecret());
+            payload.addProperty("appId", config.platforms().qq().appId());
+            payload.addProperty("clientSecret", config.platforms().qq().appSecret());
 
             HttpRequest request = HttpRequest.newBuilder()
                     .header("Content-Type", "application/json")
@@ -112,26 +111,6 @@ public class NetworkHelper {
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             return parseUploadedFileInfo(response, "upload private media(base64)");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String readUrlAsBase64(String url) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET()
-                    .build();
-
-            HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("Failed to fetch media url: status=" + response.statusCode() + " url=" + url);
-            }
-            return Base64.getEncoder().encodeToString(response.body());
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
             throw new RuntimeException(e);
         }
     }
