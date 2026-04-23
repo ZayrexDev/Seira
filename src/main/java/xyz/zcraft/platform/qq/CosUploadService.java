@@ -33,6 +33,7 @@ public class CosUploadService {
     }
 
     public String uploadFromUrl(String sourceUrl, int fileType) {
+        LOG.info("Processing file upload from url: " + sourceUrl);
         if (config == null || !config.isConfigured()) {
             return sourceUrl;
         }
