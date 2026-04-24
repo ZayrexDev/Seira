@@ -15,7 +15,6 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.Map;
 
 public class NetworkHelper {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
@@ -81,7 +80,10 @@ public class NetworkHelper {
 
     public static String buildMessageJson(Message message) {
         final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();
-        asJsonObject.add("message_reference", new Gson().toJsonTree(Map.of("message_id", message.getMsgId())));
+//        asJsonObject.add("message_reference", new Gson().toJsonTree(Map.of(
+//                "message_id", message.getMsgId(),
+//                "ignore_get_message_error", true
+//        )));
         return asJsonObject.toString();
     }
 
