@@ -416,7 +416,7 @@ public class APIHelper {
 
         if (data.has("scores") && data.get("scores").isJsonArray()) {
             JsonArray scores = data.getAsJsonArray("scores");
-            sb.append("共%d个成绩: \n".formatted(scores.size()));
+            sb.append("共%d个成绩:".formatted(scores.size()));
 
             for (JsonElement element : scores) {
                 if (!element.isJsonObject()) {
