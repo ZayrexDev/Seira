@@ -11,10 +11,7 @@ import xyz.zcraft.data.*;
 import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -249,7 +246,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     final APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target);
                     videoRenderRecord.updateRenderTask(senderUserId, replayRenderTask.taskId());
                     return replayRenderTask;
-                }, senderUserId);
+                });
             }
             case "rsc" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -277,7 +274,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         final APIHelper.ReplayTaskInfo replayShowcaseTask = APIHelper.createReplayShowcaseTask(target, uidArray);
                         videoRenderRecord.updateRenderTask(senderUserId, replayShowcaseTask.taskId());
                         return replayShowcaseTask;
-                    }, senderUserId);
+                    });
                 }
 
                 if (target.explicitId() == null) {
@@ -287,7 +284,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     final APIHelper.ReplayTaskInfo showcaseRenderTaskByBeatmap = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray);
                     videoRenderRecord.updateRenderTask(senderUserId, showcaseRenderTaskByBeatmap.taskId());
                     return showcaseRenderTaskByBeatmap;
-                }, senderUserId);
+                });
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -559,7 +556,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         return new UidListResolution(merged.toArray(String[]::new), null);
     }
 
-    private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator, String senderUserId) {
+    private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
 
         return queueApiRequestUntilSubmit(
@@ -594,7 +591,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
                     }
                 },
-                () -> videoRenderRecord.removeRenderTask(senderUserId)
+                () -> {}
         );
     }
 

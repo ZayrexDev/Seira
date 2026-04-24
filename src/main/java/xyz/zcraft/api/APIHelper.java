@@ -446,7 +446,7 @@ public class APIHelper {
             return null;
         }
 
-        return "%s - %s - %s - %s".formatted(username, rank, accuracy, pp);
+        return "%s / %s / %s / %s".formatted(username, rank, accuracy, pp);
     }
 
     private static String getScoreField(JsonObject score, String field) {
