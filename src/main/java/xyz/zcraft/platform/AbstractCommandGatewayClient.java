@@ -385,7 +385,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
                     }
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/rstat <任务ID>"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
                 }
 
             }
@@ -400,14 +400,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         /ms <铺面集ID> - 获取铺面集图谱
                         /r <成绩ID或快捷查询> - 生成成绩回放视频
                         /rsc <铺面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
+                        /rstat [任务ID] - 查询渲染进度
                         /sms <关键字> - 搜索铺面集
                         /c <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
                         /lb [铺面ID] - /c 的别名（省略参数时走绑定用户）
                         /daily - 获取每日挑战
                         /mp - 获取多人房间列表
                         /status - 获取服务器状态
-                        /help - 显示此帮助信息
-                        """));
+                        /help - 显示此帮助信息"""));
             }
             default -> {
                 return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
