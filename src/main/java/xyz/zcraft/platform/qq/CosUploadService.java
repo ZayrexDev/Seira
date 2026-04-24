@@ -27,9 +27,15 @@ public class CosUploadService {
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     private final CosConfig config;
+    private final COSClient client;
 
     public CosUploadService(CosConfig config) {
         this.config = config;
+        COSCredentials credentials = new BasicCOSCredentials(config.secretId(), config.secretKey());
+        ClientConfig clientConfig = new ClientConfig(new Region(config.region()));
+        client = new COSClient(credentials, clientConfig);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(client::shutdown));
     }
 
     public String uploadFromUrl(String sourceUrl, int fileType) {
@@ -41,27 +47,19 @@ public class CosUploadService {
         DownloadedMedia media = downloadMedia(sourceUrl);
         String objectKey = buildObjectKey(fileType, sourceUrl, media.contentType());
 
-        COSCredentials credentials = new BasicCOSCredentials(config.secretId(), config.secretKey());
-        ClientConfig clientConfig = new ClientConfig(new Region(config.region()));
-
-        COSClient client = new COSClient(credentials, clientConfig);
-        try {
-            ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentLength(media.content().length);
-            if (media.contentType() != null && !media.contentType().isBlank()) {
-                metadata.setContentType(media.contentType());
-            }
-
-            PutObjectRequest putObjectRequest = new PutObjectRequest(
-                    config.bucket(),
-                    objectKey,
-                    new ByteArrayInputStream(media.content()),
-                    metadata
-            );
-            client.putObject(putObjectRequest);
-        } finally {
-            client.shutdown();
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(media.content().length);
+        if (media.contentType() != null && !media.contentType().isBlank()) {
+            metadata.setContentType(media.contentType());
         }
+
+        PutObjectRequest putObjectRequest = new PutObjectRequest(
+                config.bucket(),
+                objectKey,
+                new ByteArrayInputStream(media.content()),
+                metadata
+        );
+        client.putObject(putObjectRequest);
 
         String cosUrl = buildObjectUrl(objectKey);
         LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, cosUrl);
