@@ -257,7 +257,11 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return RouteDecision.sync(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
                 }
 
-                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, platform, senderUserId);
+                if (args.length != targetResolution.consumedArgs()) {
+                    return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
+                }
+                ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
@@ -387,7 +391,6 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
                 }
-
             }
             case "help" -> {
                 return RouteDecision.sync(PendingMessage.ofString("""
