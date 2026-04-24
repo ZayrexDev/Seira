@@ -21,6 +21,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public abstract class AbstractCommandGatewayClient extends WebSocketClient implements PlatformGatewayClient {
+    public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
+    public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
+    public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
+    public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
+    public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
     private static final String PREFIX = "/";
     private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
@@ -30,12 +35,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$"); // 12345#1
     private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
     private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
-    public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
-    public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
-    public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
-    public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
-    public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
     private final PlatformMessageSender messageSender;
+    private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
 
     protected AbstractCommandGatewayClient(URI serverUri, PlatformMessageSender messageSender) {
         super(serverUri);
@@ -244,7 +245,11 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
-                return queueReplayTask("r", () -> APIHelper.createReplayRenderTask(target));
+                return queueReplayTask("r", () -> {
+                    final APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target);
+                    videoRenderRecord.updateRenderTask(senderUserId, replayRenderTask.taskId());
+                    return replayRenderTask;
+                }, senderUserId);
             }
             case "rsc" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -268,13 +273,21 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 String[] uidArray = uidListResolution.uids();
 
                 if (target.isMacro()) {
-                    return queueReplayTask("rsc", () -> APIHelper.createReplayShowcaseTask(target, uidArray));
+                    return queueReplayTask("rsc", () -> {
+                        final APIHelper.ReplayTaskInfo replayShowcaseTask = APIHelper.createReplayShowcaseTask(target, uidArray);
+                        videoRenderRecord.updateRenderTask(senderUserId, replayShowcaseTask.taskId());
+                        return replayShowcaseTask;
+                    }, senderUserId);
                 }
 
                 if (target.explicitId() == null) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
-                return queueReplayTask("rsc", () -> APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray));
+                return queueReplayTask("rsc", () -> {
+                    final APIHelper.ReplayTaskInfo showcaseRenderTaskByBeatmap = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray);
+                    videoRenderRecord.updateRenderTask(senderUserId, showcaseRenderTaskByBeatmap.taskId());
+                    return showcaseRenderTaskByBeatmap;
+                }, senderUserId);
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -366,11 +379,18 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 return RouteDecision.sync(PendingMessage.ofString(APIHelper.getServerStatus()));
             }
             case "rstat" -> {
-                if (args.length != 1) {
+                if (args.length == 1) {
+                    return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(args[0])));
+                } else if (args.length == 0) {
+                    if(videoRenderRecord.hasRenderTask(senderUserId)) {
+                        return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(videoRenderRecord.getRenderTask(senderUserId))));
+                    } else {
+                        return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
+                    }
+                } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/rstat <任务ID>"));
                 }
 
-                return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(args[0])));
             }
             case "help" -> {
                 return RouteDecision.sync(PendingMessage.ofString("""
@@ -539,7 +559,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         return new UidListResolution(merged.toArray(String[]::new), null);
     }
 
-    private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
+    private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator, String senderUserId) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
 
         return queueApiRequestUntilSubmit(
@@ -574,7 +594,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
                     }
                 },
-                () -> {}
+                () -> videoRenderRecord.removeRenderTask(senderUserId)
         );
     }
 
@@ -753,7 +773,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         void execute();
     }
 
-    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer, boolean completeStatsAfterExecutor) {
+    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor,
+                           ApiTaskFinalizer finalizer, boolean completeStatsAfterExecutor) {
     }
 
     private record TargetResolution(ShortcutTarget target, int consumedArgs) {
