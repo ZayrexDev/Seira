@@ -634,6 +634,8 @@ public class APIHelper {
     }
 
     public static String getServerStatus() {
+        boolean oStella = false;
+        boolean osu = false;
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/status"))
@@ -641,35 +643,34 @@ public class APIHelper {
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final Response response = GSON.fromJson(send.body(), Response.class);
+            if (send.statusCode() == 200
+                    && send.body() != null
+                    && response != null
+                    && response.isSuccess()) {
+                        oStella = true;
 
+                        if(response.getData() != null && response.getData().isJsonObject()) {
+                            JsonObject data = response.getData().getAsJsonObject();
+                            if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
+                                osu = data.get("osu-api").getAsBoolean();
+                            }
+                        }
+                    }
+        } catch (Exception _) {
+        }
 
             StringBuilder sb = new StringBuilder();
             sb.append("服务器状态: \n");
             sb.append("消息网关: ✅ 正常\n");
-            sb.append("oStella API: ");
+            sb.append("oStella API: ").append(oStella ? "✅ 正常" : "❌ 无法访问").append("\n");
 
-            final Response response = GSON.fromJson(send.body(), Response.class);
-
-            if(send.statusCode() != 200
-                    || send.body() == null
-                    || response == null
-                    || !response.isSuccess()) {
-                sb.append("❌ 无法访问\n");
-            } else {
-                sb.append("✅ 正常\n");
-
-                if(response.getData() != null && response.getData().isJsonObject()) {
-                    JsonObject data = response.getData().getAsJsonObject();
-                    if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
-                        sb.append("osu!API: ").append(data.get("osu-api").getAsBoolean() ? "✅ 正常" : "❌ 无法访问").append("\n");
-                    }
-                }
+            if(oStella) {
+                sb.append("osu! API: ").append(osu ? "✅ 正常" : "❌ 无法访问").append("\n");
             }
 
             return sb.toString().trim();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId) {
