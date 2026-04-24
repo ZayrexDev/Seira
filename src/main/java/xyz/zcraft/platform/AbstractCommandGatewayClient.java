@@ -258,7 +258,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 }
 
                 TargetResolution targetResolution = resolveTargetWithOptionalMention(args, platform, senderUserId);
-                if (args.length != targetResolution.consumedArgs()) {
+                if (args.length - targetResolution.consumedArgs() > 1) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
                 ShortcutTarget target = targetResolution.target();
@@ -266,7 +266,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                String extraUidArg = args.length == 2 ? args[1] : null;
+                String extraUidArg =
+                        (args.length - targetResolution.consumedArgs() == 1) ? args[targetResolution.consumedArgs()] : null;
                 UidListResolution uidListResolution = resolveRscUidList(platform, groupId, extraUidArg);
                 if (uidListResolution.errorMessage() != null) {
                     return RouteDecision.sync(PendingMessage.ofString(uidListResolution.errorMessage()));
