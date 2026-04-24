@@ -635,7 +635,7 @@ public class APIHelper {
             final JsonObject data = r.getData().getAsJsonObject();
 
             StringBuilder sb = new StringBuilder();
-            sb.append("任务ID: ").append(jobId.substring(7)).append("\n");
+            sb.append("任务ID: ").append(jobId, 0, 8).append("\n");
 
             final JsonElement jsonElement = data.get("status");
             final String status = jsonElement != null ? jsonElement.getAsString() : null;
