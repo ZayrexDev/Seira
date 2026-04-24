@@ -249,7 +249,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 });
             }
             case "rsc" -> {
-                if (args.length < 1 || args.length > 2) {
+                if (args.length < 1 || args.length > 3) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
 
