@@ -406,9 +406,18 @@ public class APIHelper {
     }
 
     private static String buildReplayTaskMessage(JsonObject data) {
+        StringBuilder sb = new StringBuilder();
+        if (data.has("beatmap") && data.get("beatmap").isJsonObject()) {
+            JsonObject beatmap = data.getAsJsonObject("beatmap");
+            sb.append("铺面信息: \n");
+            sb.append(beatmap.get("artist").getAsString()).append(" - ").append(beatmap.get("title").getAsString()).append("\n");
+            sb.append(beatmap.get("star").getAsString()).append(beatmap.get("version").getAsString()).append("\n");
+        }
+
         if (data.has("scores") && data.get("scores").isJsonArray()) {
-            StringBuilder sb = new StringBuilder();
             JsonArray scores = data.getAsJsonArray("scores");
+            sb.append("共%d个成绩: \n".formatted(scores.size()));
+
             for (JsonElement element : scores) {
                 if (!element.isJsonObject()) {
                     continue;
@@ -422,39 +431,6 @@ public class APIHelper {
                 }
                 sb.append(line);
             }
-            return sb.isEmpty() ? null : sb.toString();
-        }
-
-        JsonObject score = data.has("score") && data.get("score").isJsonObject()
-                ? data.getAsJsonObject("score")
-                : null;
-        if (score == null) {
-            return null;
-        }
-
-        String title = getScoreField(score, "title");
-        String artist = getScoreField(score, "artist");
-        String version = getScoreField(score, "version");
-        String star = getScoreField(score, "star");
-
-        StringBuilder sb = new StringBuilder();
-        if (title != null || artist != null || version != null || star != null) {
-            sb.append(orDash(title))
-                    .append(" - ")
-                    .append(orDash(artist))
-                    .append(" [")
-                    .append(orDash(version))
-                    .append(" ")
-                    .append(orDash(star))
-                    .append("]");
-        }
-
-        String scoreLine = buildScoreLine(score);
-        if (scoreLine != null) {
-            if (!sb.isEmpty()) {
-                sb.append("\n");
-            }
-            sb.append(scoreLine);
         }
 
         return sb.isEmpty() ? null : sb.toString();
@@ -470,7 +446,7 @@ public class APIHelper {
             return null;
         }
 
-        return orDash(username) + " - " + orDash(rank) + " - " + orDash(accuracy) + " - " + orDash(pp);
+        return "%s - %s - %s - %s".formatted(username, rank, accuracy, pp);
     }
 
     private static String getScoreField(JsonObject score, String field) {
@@ -482,10 +458,6 @@ public class APIHelper {
         } catch (Exception ignored) {
             return null;
         }
-    }
-
-    private static String orDash(String value) {
-        return value == null || value.isBlank() ? "-" : value;
     }
 
     private static void waitReplayDone(String taskId) {

@@ -15,6 +15,7 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Map;
 
 public class NetworkHelper {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
@@ -66,7 +67,7 @@ public class NetworkHelper {
         try {
             final var request = newRequestBuilder(accessToken)
                     .uri(URI.create(ENDPOINT + "/v2/users/" + openId + "/messages"))
-                    .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(message)))
+                    .POST(HttpRequest.BodyPublishers.ofString(buildMessageJson(message)))
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -76,6 +77,12 @@ public class NetworkHelper {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static String buildMessageJson(Message message) {
+        final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();
+        asJsonObject.add("message_reference", new Gson().toJsonTree(Map.of("message_id", message.getMsgId())));
+        return asJsonObject.toString();
     }
 
     public static FileInfo uploadPrivateMedia(AccessToken accessToken, String openId, int fileType, String url) {

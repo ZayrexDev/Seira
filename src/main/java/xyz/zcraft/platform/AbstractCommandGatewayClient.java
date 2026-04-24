@@ -382,7 +382,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (args.length == 1) {
                     return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(args[0])));
                 } else if (args.length == 0) {
-                    if(videoRenderRecord.hasRenderTask(senderUserId)) {
+                    if (videoRenderRecord.hasRenderTask(senderUserId)) {
                         return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(videoRenderRecord.getRenderTask(senderUserId))));
                     } else {
                         return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
@@ -705,20 +705,24 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
             if (fileInfo == null) {
                 LOG.error("Failed to upload media for message {}", messageId);
-                return;
+                message.setContent("媒体文件上传失败");
+                message.setMsgType(0);
+            } else {
+                LOG.info("Media uploaded for message {}", messageId);
+                message.setMedia(fileInfo);
             }
-            LOG.info("Media uploaded for message {}", messageId);
-            message.setMedia(fileInfo);
         } else if (pendingMsg.getFileBase64() != null) {
             FileInfo fileInfo = groupMessage
                     ? messageSender.uploadGroupMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64())
                     : messageSender.uploadPrivateMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
             if (fileInfo == null) {
                 LOG.error("Failed to upload base64 media for message {}", messageId);
-                return;
+                message.setContent("媒体文件上传失败");
+                message.setMsgType(0);
+            } else {
+                LOG.info("Base64 media uploaded for message {}", messageId);
+                message.setMedia(fileInfo);
             }
-            LOG.info("Base64 media uploaded for message {}", messageId);
-            message.setMedia(fileInfo);
         }
 
         if (groupMessage) {
