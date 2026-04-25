@@ -435,7 +435,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 return new ShortcutTarget(null, null, null, null, "铺面集索引无效。例如: 12345#2");
             }
 
-            return new ShortcutTarget(setId, null, "ms", index, null);
+            Integer uid = resolveBoundUid(platform, senderUserId);
+
+            return new ShortcutTarget(setId, uid, "ms", index, null);
         }
 
         Matcher userMatcher = USER_MACRO_PATTERN.matcher(arg.trim());
@@ -460,7 +462,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
         Matcher beatmapMatcher = BEATMAP_MACRO_PATTERN.matcher(arg.trim());
         if (beatmapMatcher.matches()) {
-            Long mapId = parsePositiveLong(setMatcher.group(1));
+            Long mapId = parsePositiveLong(beatmapMatcher.group(1));
             Integer uid = resolveBoundUid(platform, senderUserId);
             return new ShortcutTarget(mapId, uid, "m", null, null);
         }
