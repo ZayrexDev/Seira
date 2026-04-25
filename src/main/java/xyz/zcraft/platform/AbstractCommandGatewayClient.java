@@ -1,5 +1,6 @@
 package xyz.zcraft.platform;
 
+import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
@@ -704,10 +705,15 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     private void sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
         Message message = new Message();
-        message.setContent(pendingMsg.getContent());
         message.setMsgType(pendingMsg.getMsgType());
         message.setMsgId(messageId);
         message.setMsgSeq(messageSeqCounter.getAndIncrement());
+
+        if (pendingMsg.getMsgType() == PendingMessage.MSG_TYPE_MARKDOWN) {
+            message.setMarkdown(new Gson().toJsonTree(Map.of("content", pendingMsg.getContent())).getAsJsonObject());
+        } else {
+            message.setContent(pendingMsg.getContent());
+        }
 
         if (pendingMsg.getFileUrl() != null) {
             LOG.info("Uploading media for {}", messageId);
