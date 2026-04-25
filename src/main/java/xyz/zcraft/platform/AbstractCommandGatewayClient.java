@@ -30,6 +30,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
     private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$"); // bo25, rs1
     private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$"); // 12345#1
+    private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$"); // m12345
     private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
     private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
     private final PlatformMessageSender messageSender;
@@ -147,7 +148,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
 
-                    return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                 }
@@ -188,7 +189,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
 
-                    return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                 }
@@ -305,7 +306,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(target)));
+                return queueApiRequest("ms", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(target)));
             }
             case "sms" -> {
                 if (args.length == 0) {
@@ -455,6 +456,13 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             }
 
             return new ShortcutTarget(null, uid, type, index, null);
+        }
+
+        Matcher beatmapMatcher = BEATMAP_MACRO_PATTERN.matcher(arg.trim());
+        if (beatmapMatcher.matches()) {
+            Long mapId = parsePositiveLong(setMatcher.group(1));
+            Integer uid = resolveBoundUid(platform, senderUserId);
+            return new ShortcutTarget(mapId, uid, "m", null, null);
         }
 
         Long id = parsePositiveLong(arg);

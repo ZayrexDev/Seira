@@ -262,7 +262,13 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                if(Objects.equals(target.macroType(), "bo") ||  Objects.equals(target.macroType(), "rs")) {
+                    query = "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                } else if (Objects.equals(target.macroType(), "m")) {
+                    query = "/s?m=" + target.explicitId() + "&u=" + target.boundUid();
+                } else {
+                    throw new IllegalArgumentException("Invalid macro type");
+                }
             } else {
                 query = "/s?s=" + target.explicitId();
             }
